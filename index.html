@@ -1,1512 +1,513 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MaintainIQ — Asset & Maintenance Platform</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<style>
-/* =========================================================
-   MaintainIQ — Design tokens
-   ========================================================= */
-:root{
-  --ink:#161F2B;
-  --ink-soft:#2B3849;
-  --paper:#EEF1F0;
-  --card:#FFFFFF;
-  --line:#DCE2E1;
-  --line-strong:#C3CBC9;
-  --accent:#E8A33D;
-  --accent-ink:#6E4510;
-  --muted:#6B7684;
-
-  --status-operational:#2F9E5C;
-  --status-issue:#E8A33D;
-  --status-inspection:#3E8FC1;
-  --status-maintenance:#C1653E;
-  --status-outofservice:#C13E3E;
-  --status-retired:#8A8F94;
-
-  --font-display:'Space Grotesk', sans-serif;
-  --font-body:'Inter', sans-serif;
-  --font-mono:'JetBrains Mono', monospace;
-
-  --radius:10px;
-  --shadow:0 1px 2px rgba(22,31,43,0.06), 0 6px 20px rgba(22,31,43,0.06);
-}
-
-*{box-sizing:border-box;}
-html,body{margin:0;padding:0;}
-body{
-  font-family:var(--font-body);
-  background:var(--paper);
-  color:var(--ink);
-  -webkit-font-smoothing:antialiased;
-}
-h1,h2,h3,h4{font-family:var(--font-display); margin:0; letter-spacing:-0.01em;}
-p{margin:0;}
-button{font-family:var(--font-body); cursor:pointer;}
-a{color:inherit;}
-::selection{background:var(--accent); color:var(--ink);}
-
-/* focus visibility */
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{
-  outline:2px solid var(--accent);
-  outline-offset:2px;
-}
-
-/* =========================================================
-   App shell
-   ========================================================= */
-.app{display:flex; min-height:100vh;}
-
-.sidebar{
-  width:230px;
-  flex-shrink:0;
-  background:var(--ink);
-  color:#EAEDEF;
-  display:flex;
-  flex-direction:column;
-  padding:22px 16px;
-  position:sticky;
-  top:0;
-  height:100vh;
-}
-.brand{
-  display:flex; align-items:center; gap:10px;
-  padding:4px 6px 22px 6px;
-  border-bottom:1px solid rgba(255,255,255,0.08);
-  margin-bottom:18px;
-}
-.brand-mark{
-  width:34px; height:34px; border-radius:8px;
-  background:var(--accent);
-  display:flex; align-items:center; justify-content:center;
-  font-family:var(--font-display); font-weight:700; color:var(--ink); font-size:16px;
-  flex-shrink:0;
-}
-.brand-text .name{font-family:var(--font-display); font-weight:700; font-size:16px; line-height:1.1;}
-.brand-text .tag{font-size:10.5px; color:#9AA5AF; letter-spacing:.04em; text-transform:uppercase;}
-
-.nav{display:flex; flex-direction:column; gap:2px;}
-.nav-item{
-  display:flex; align-items:center; gap:10px;
-  padding:10px 12px; border-radius:8px;
-  color:#C7CFD5; background:none; border:none;
-  font-size:14px; font-weight:500; text-align:left; width:100%;
-  transition:background .12s ease, color .12s ease;
-}
-.nav-item svg{flex-shrink:0; opacity:.85;}
-.nav-item:hover{background:rgba(255,255,255,0.06); color:#fff;}
-.nav-item.active{background:var(--accent); color:var(--ink); font-weight:600;}
-.nav-item.active svg{opacity:1;}
-
-.sidebar-foot{
-  margin-top:auto; padding-top:16px; border-top:1px solid rgba(255,255,255,0.08);
-}
-.reset-btn{
-  width:100%; background:transparent; border:1px solid rgba(255,255,255,0.18);
-  color:#C7CFD5; padding:9px 10px; border-radius:8px; font-size:12.5px; font-weight:500;
-  display:flex; align-items:center; gap:8px; justify-content:center;
-}
-.reset-btn:hover{border-color:var(--status-outofservice); color:#fff; background:rgba(193,62,62,0.15);}
-
-.main{flex:1; min-width:0; display:flex; flex-direction:column;}
-
-.topbar{
-  display:flex; align-items:center; gap:16px;
-  padding:16px 28px; background:var(--card); border-bottom:1px solid var(--line);
-  position:sticky; top:0; z-index:20;
-}
-.topbar h1{font-size:19px;}
-.topbar .sub{font-size:12.5px; color:var(--muted); margin-top:2px;}
-.search-box{
-  margin-left:auto; display:flex; align-items:center; gap:8px;
-  background:var(--paper); border:1px solid var(--line); border-radius:8px;
-  padding:8px 12px; min-width:220px;
-}
-.search-box input{border:none; background:none; outline:none; font-size:13.5px; width:100%; color:var(--ink);}
-.search-box svg{flex-shrink:0; color:var(--muted);}
-
-.btn{
-  border-radius:8px; font-weight:600; font-size:13.5px;
-  padding:9px 16px; border:1px solid transparent; display:inline-flex; align-items:center; gap:7px;
-  white-space:nowrap;
-}
-.btn-primary{background:var(--ink); color:#fff;}
-.btn-primary:hover{background:var(--ink-soft);}
-.btn-accent{background:var(--accent); color:var(--ink);}
-.btn-accent:hover{filter:brightness(1.06);}
-.btn-ghost{background:var(--card); border-color:var(--line-strong); color:var(--ink);}
-.btn-ghost:hover{background:var(--paper);}
-.btn-danger{background:#fff; border-color:var(--status-outofservice); color:var(--status-outofservice);}
-.btn-danger:hover{background:var(--status-outofservice); color:#fff;}
-.btn-sm{padding:6px 10px; font-size:12.5px;}
-.btn:disabled{opacity:.45; cursor:not-allowed;}
-
-.view{padding:24px 28px 60px 28px; display:none;}
-.view.active{display:block;}
-
-/* =========================================================
-   Dashboard
-   ========================================================= */
-.stat-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:24px;}
-.stat-card{
-  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
-  padding:16px 18px; box-shadow:var(--shadow);
-}
-.stat-card .num{font-family:var(--font-display); font-size:28px; font-weight:700; line-height:1;}
-.stat-card .label{font-size:12px; color:var(--muted); margin-top:6px; text-transform:uppercase; letter-spacing:.03em;}
-.stat-card.accent-left{border-left:4px solid var(--accent);}
-
-.dash-grid{display:grid; grid-template-columns:1.3fr 1fr; gap:18px;}
-@media (max-width:980px){.dash-grid{grid-template-columns:1fr;}}
-
-.panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden;}
-.panel-head{display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--line);}
-.panel-head h3{font-size:14.5px;}
-.panel-body{padding:6px 0;}
-
-.row-item{display:flex; align-items:center; gap:12px; padding:11px 18px; border-bottom:1px solid var(--line); font-size:13.5px;}
-.row-item:last-child{border-bottom:none;}
-.row-item .meta{color:var(--muted); font-size:12px;}
-.row-item .grow{flex:1; min-width:0;}
-.row-item .grow p{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-
-.empty-row{padding:24px 18px; text-align:center; color:var(--muted); font-size:13px;}
-
-/* =========================================================
-   Badges / status chips
-   ========================================================= */
-.badge{
-  display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:100px;
-  font-size:11px; font-weight:600; letter-spacing:.01em; white-space:nowrap;
-}
-.badge::before{content:''; width:6px; height:6px; border-radius:50%; background:currentColor;}
-.badge.status-Operational{background:#E4F5EB; color:var(--status-operational);}
-.badge.status-Issue-Reported{background:#FCEFDA; color:var(--status-issue);}
-.badge.status-Under-Inspection{background:#E2F0F9; color:var(--status-inspection);}
-.badge.status-Under-Maintenance{background:#F7E7DD; color:var(--status-maintenance);}
-.badge.status-Out-of-Service{background:#FBE3E3; color:var(--status-outofservice);}
-.badge.status-Retired{background:#EBEBEC; color:var(--status-retired);}
-
-.badge.issue-Reported{background:#FCEFDA; color:var(--status-issue);}
-.badge.issue-Assigned{background:#E2F0F9; color:var(--status-inspection);}
-.badge.issue-Inspection-Started{background:#E2F0F9; color:var(--status-inspection);}
-.badge.issue-Maintenance-In-Progress{background:#F7E7DD; color:var(--status-maintenance);}
-.badge.issue-Waiting-for-Parts{background:#EFE7F7; color:#7B4FC1;}
-.badge.issue-Resolved{background:#E4F5EB; color:var(--status-operational);}
-.badge.issue-Closed{background:#EBEBEC; color:var(--status-retired);}
-.badge.issue-Reopened{background:#FBE3E3; color:var(--status-outofservice);}
-
-.priority-chip{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; letter-spacing:.02em; text-transform:uppercase;}
-.priority-Critical{color:var(--status-outofservice);}
-.priority-High{color:#C1653E;}
-.priority-Medium{color:var(--accent-ink);}
-.priority-Low{color:var(--muted);}
-.priority-Critical::before{content:'▲ ';}
-
-/* =========================================================
-   Toolbars / filters
-   ========================================================= */
-.toolbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
-.toolbar .grow-search{flex:1; min-width:200px; display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:9px 12px;}
-.toolbar .grow-search input{border:none; outline:none; background:none; font-size:13.5px; width:100%;}
-.toolbar select{
-  border:1px solid var(--line); border-radius:8px; background:var(--card); padding:9px 10px; font-size:13px; color:var(--ink);
-}
-
-/* =========================================================
-   Asset grid / cards ("equipment tag" motif — signature element)
-   ========================================================= */
-.asset-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px;}
-
-.tag-card{
-  background:var(--card);
-  border:1px dashed var(--line-strong);
-  border-radius:12px;
-  padding:16px 16px 14px 16px;
-  position:relative;
-  box-shadow:var(--shadow);
-  transition:transform .12s ease, border-color .12s ease;
-  cursor:pointer;
-}
-.tag-card:hover{transform:translateY(-2px); border-color:var(--accent);}
-.tag-card::before{ /* punch hole */
-  content:'';
-  position:absolute; top:14px; left:14px;
-  width:9px; height:9px; border-radius:50%;
-  background:var(--paper); border:1px solid var(--line-strong);
-}
-.tag-card-head{display:flex; justify-content:flex-end; margin-bottom:6px;}
-.tag-card h4{font-size:15.5px; margin-bottom:2px; padding-left:16px;}
-.tag-code{font-family:var(--font-mono); font-size:11.5px; color:var(--muted); padding-left:16px; letter-spacing:.02em;}
-.tag-meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; padding-left:16px;}
-.tag-meta span.pill{background:var(--paper); border:1px solid var(--line); border-radius:100px; padding:3px 9px; font-size:11px; color:var(--ink-soft);}
-.tag-card-foot{display:flex; align-items:center; justify-content:space-between; margin-top:14px; padding-left:16px;}
-
-/* =========================================================
-   Tables (issues list)
-   ========================================================= */
-.table-wrap{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);}
-table{width:100%; border-collapse:collapse; font-size:13.5px;}
-thead th{
-  text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
-  padding:12px 16px; border-bottom:1px solid var(--line); background:var(--paper);
-}
-tbody td{padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:middle;}
-tbody tr:last-child td{border-bottom:none;}
-tbody tr{transition:background .1s ease;}
-tbody tr.clickable:hover{background:var(--paper); cursor:pointer;}
-.issue-id{font-family:var(--font-mono); font-size:12px; color:var(--muted);}
-
-/* =========================================================
-   Modal
-   ========================================================= */
-.overlay{
-  position:fixed; inset:0; background:rgba(22,31,43,0.55);
-  display:none; align-items:flex-start; justify-content:center;
-  padding:40px 16px; overflow-y:auto; z-index:100;
-}
-.overlay.active{display:flex;}
-.modal{
-  background:var(--card); border-radius:14px; width:100%; max-width:560px;
-  box-shadow:0 20px 60px rgba(0,0,0,0.25); animation:pop .14s ease;
-}
-.modal.wide{max-width:760px;}
-@keyframes pop{from{opacity:0; transform:translateY(6px) scale(.98);} to{opacity:1; transform:none;}}
-.modal-head{display:flex; align-items:flex-start; justify-content:space-between; padding:20px 22px 14px 22px; border-bottom:1px solid var(--line);}
-.modal-head h2{font-size:18px;}
-.modal-head .sub{font-size:12.5px; color:var(--muted); margin-top:3px;}
-.modal-close{background:none; border:none; color:var(--muted); font-size:20px; line-height:1; padding:4px;}
-.modal-close:hover{color:var(--ink);}
-.modal-body{padding:20px 22px;}
-.modal-foot{display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--line);}
-
-.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
-.form-grid.single{grid-template-columns:1fr;}
-.field{display:flex; flex-direction:column; gap:6px; margin-bottom:14px;}
-.field label{font-size:12.5px; font-weight:600; color:var(--ink-soft);}
-.field .hint{font-size:11px; color:var(--muted); font-weight:400;}
-.field input, .field select, .field textarea{
-  border:1px solid var(--line-strong); border-radius:8px; padding:9px 11px; font-size:13.5px; font-family:var(--font-body);
-  background:var(--card); color:var(--ink);
-}
-.field textarea{resize:vertical; min-height:70px;}
-/* .field input:invalid{}  */
-.field.error input, .field.error textarea, .field.error select{border-color:var(--status-outofservice);}
-.field-error{font-size:11.5px; color:var(--status-outofservice); display:none;}
-.field.error .field-error{display:block;}
-
-.banner{
-  border-radius:8px; padding:10px 12px; font-size:12.5px; display:flex; gap:8px; align-items:flex-start; margin-bottom:14px;
-}
-.banner.info{background:#E2F0F9; color:#1E5A80;}
-.banner.warn{background:#FCEFDA; color:var(--accent-ink);}
-.banner.danger{background:#FBE3E3; color:#8A2323;}
-
-/* =========================================================
-   Asset detail / public page
-   ========================================================= */
-.detail-grid{display:grid; grid-template-columns:1fr 200px; gap:22px;}
-@media (max-width:640px){.detail-grid{grid-template-columns:1fr;}}
-.qr-box{
-  border:1px dashed var(--line-strong); border-radius:12px; padding:14px; text-align:center; background:var(--paper);
-}
-.qr-box #qrcode-target{display:flex; justify-content:center; margin-bottom:10px;}
-.qr-box img, .qr-box canvas{border-radius:6px; background:#fff; padding:6px;}
-.qr-actions{display:flex; flex-direction:column; gap:6px; margin-top:10px;}
-
-.info-list{display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; margin:16px 0;}
-.info-list .item .k{font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted);}
-.info-list .item .v{font-size:14px; font-weight:500; margin-top:2px;}
-
-.section-title{font-size:12.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:22px 0 10px 0; font-weight:700;}
-
-.timeline{display:flex; flex-direction:column; gap:0;}
-.timeline-item{display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); font-size:13px;}
-.timeline-item:last-child{border-bottom:none;}
-.timeline-dot{width:8px; height:8px; border-radius:50%; background:var(--accent); margin-top:5px; flex-shrink:0;}
-.timeline-item .body{flex:1;}
-.timeline-item .action{font-weight:600;}
-.timeline-item .meta{font-size:11.5px; color:var(--muted); margin-top:2px;}
-
-.tab-row{display:flex; gap:6px; border-bottom:1px solid var(--line); margin-bottom:16px;}
-.tab-btn{background:none; border:none; padding:9px 4px; margin-right:16px; font-size:13.5px; font-weight:600; color:var(--muted); border-bottom:2px solid transparent;}
-.tab-btn.active{color:var(--ink); border-bottom-color:var(--accent);}
-.tab-panel{display:none;}
-.tab-panel.active{display:block;}
-
-/* Public asset page */
-.public-page{max-width:520px; margin:0 auto; padding:32px 20px 60px 20px;}
-.public-head{display:flex; align-items:center; gap:10px; margin-bottom:22px;}
-.public-badge{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;}
-.retired-banner{background:#EBEBEC; color:var(--status-retired); padding:10px 14px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:16px; text-align:center;}
-
-/* toast */
-#toast{
-  position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(10px);
-  background:var(--ink); color:#fff; padding:11px 18px; border-radius:8px; font-size:13px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.25); opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease;
-  z-index:200; display:flex; align-items:center; gap:8px;
-}
-#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
-#toast.err{background:var(--status-outofservice);}
-
-/* Responsive */
-.hamburger{display:none; background:none; border:none; color:var(--ink);}
-@media (max-width:860px){
-  .sidebar{position:fixed; left:-240px; z-index:150; transition:left .18s ease; box-shadow:0 0 0 100vmax rgba(0,0,0,0);}
-  .sidebar.open{left:0; box-shadow:0 0 0 100vmax rgba(0,0,0,0.4);}
-  .hamburger{display:flex; align-items:center; justify-content:center;}
-  .form-grid{grid-template-columns:1fr;}
-  .info-list{grid-template-columns:1fr;}
-  .detail-grid{grid-template-columns:1fr;}
-}
-
-.small-muted{font-size:12px; color:var(--muted);}
-.divider{height:1px; background:var(--line); margin:16px 0;}
-.flex-between{display:flex; align-items:center; justify-content:space-between;}
-.icon-btn{background:none; border:1px solid var(--line-strong); border-radius:8px; padding:7px 9px; display:flex; align-items:center; color:var(--ink-soft);}
-.icon-btn:hover{background:var(--paper);}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MaintainIQ — Asset & Maintenance Platform</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+    rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
+
 <body>
 
-<div id="toast"></div>
+  <div id="toast"></div>
 
-<!-- =========================================================
+  <!-- =========================================================
      PUBLIC ASSET PAGE (shown when URL has #/asset/<code>)
      ========================================================= -->
-<div id="publicPage" style="display:none;">
-  <div class="public-page" id="publicPageContent"></div>
-</div>
+  <div id="publicPage" style="display:none;">
+    <div class="public-page" id="publicPageContent"></div>
+  </div>
 
-<!-- =========================================================
+  <!-- =========================================================
      MAIN APP
      ========================================================= -->
-<div class="app" id="appRoot">
-  <aside class="sidebar" id="sidebar">
-    <div class="brand">
-      <div class="brand-mark">Q</div>
-      <div class="brand-text">
-        <div class="name">MaintainIQ</div>
-        <div class="tag">Asset Platform</div>
-      </div>
-    </div>
-    <nav class="nav">
-      <button class="nav-item active" data-view="dashboard">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-        Dashboard
-      </button>
-      <button class="nav-item" data-view="assets">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        Assets
-      </button>
-      <button class="nav-item" data-view="issues">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
-        Issues
-      </button>
-    </nav>
-    <div class="sidebar-foot">
-      <button class="reset-btn" id="resetDemoBtn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
-        Reset demo data
-      </button>
-    </div>
-  </aside>
-
-  <div class="main">
-    <div class="topbar">
-      <button class="hamburger" id="hamburgerBtn">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-      </button>
-      <div>
-        <h1 id="topbarTitle">Dashboard</h1>
-        <div class="sub" id="topbarSub">Overview of assets and open work</div>
-      </div>
-    </div>
-
-    <!-- DASHBOARD -->
-    <section class="view active" id="view-dashboard">
-      <div class="stat-row">
-        <div class="stat-card accent-left"><div class="num" id="statTotalAssets">0</div><div class="label">Total assets</div></div>
-        <div class="stat-card"><div class="num" id="statOpenIssues">0</div><div class="label">Open issues</div></div>
-        <div class="stat-card"><div class="num" id="statCritical">0</div><div class="label">Critical priority</div></div>
-        <div class="stat-card"><div class="num" id="statOutOfService">0</div><div class="label">Out of service</div></div>
-      </div>
-      <div class="dash-grid">
-        <div class="panel">
-          <div class="panel-head"><h3>Recent issues</h3><button class="btn btn-ghost btn-sm" data-goto="issues">View all</button></div>
-          <div class="panel-body" id="dashRecentIssues"></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><h3>Recent activity</h3><span class="small-muted">Asset history</span></div>
-          <div class="panel-body" id="dashRecentActivity"></div>
+  <div class="app" id="appRoot">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">Q</div>
+        <div class="brand-text">
+          <div class="name">MaintainIQ</div>
+          <div class="tag">Asset Platform</div>
         </div>
       </div>
-    </section>
-
-    <!-- ASSETS -->
-    <section class="view" id="view-assets">
-      <div class="toolbar">
-        <div class="grow-search">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" id="assetSearch" placeholder="Search assets by name, code, or location…">
-        </div>
-        <select id="assetStatusFilter">
-          <option value="">All statuses</option>
-        </select>
-        <select id="assetCategoryFilter">
-          <option value="">All categories</option>
-        </select>
-        <button class="btn btn-accent" id="openAddAssetBtn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-          Register asset
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="9" rx="1" />
+            <rect x="14" y="3" width="7" height="5" rx="1" />
+            <rect x="14" y="12" width="7" height="9" rx="1" />
+            <rect x="3" y="16" width="7" height="5" rx="1" />
+          </svg>
+          Dashboard
+        </button>
+        <button class="nav-item" data-view="assets">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M3 9h18M9 21V9" />
+          </svg>
+          Assets
+        </button>
+        <button class="nav-item" data-view="issues">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 9v4M12 17h.01" />
+            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+          </svg>
+          Issues
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <button class="reset-btn" id="resetDemoBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+          Reset demo data
         </button>
       </div>
-      <div class="asset-grid" id="assetGrid"></div>
-    </section>
+    </aside>
 
-    <!-- ISSUES -->
-    <section class="view" id="view-issues">
-      <div class="toolbar">
-        <div class="grow-search">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" id="issueSearch" placeholder="Search issues by title, ID, or asset…">
+    <div class="main">
+      <div class="topbar">
+        <button class="hamburger" id="hamburgerBtn">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+        </button>
+        <div>
+          <h1 id="topbarTitle">Dashboard</h1>
+          <div class="sub" id="topbarSub">Overview of assets and open work</div>
         </div>
-        <select id="issueStatusFilter">
-          <option value="">All statuses</option>
-        </select>
-        <select id="issuePriorityFilter">
-          <option value="">All priorities</option>
-        </select>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Issue</th><th>Asset</th><th>Priority</th><th>Status</th><th>Reported</th><th></th></tr>
-          </thead>
-          <tbody id="issuesTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-  </div>
-</div>
 
-<!-- =========================================================
+      <!-- DASHBOARD -->
+      <section class="view active" id="view-dashboard">
+        <div class="stat-row">
+          <div class="stat-card accent-left">
+            <div class="num" id="statTotalAssets">0</div>
+            <div class="label">Total assets</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" id="statOpenIssues">0</div>
+            <div class="label">Open issues</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" id="statCritical">0</div>
+            <div class="label">Critical priority</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" id="statOutOfService">0</div>
+            <div class="label">Out of service</div>
+          </div>
+        </div>
+        <div class="dash-grid">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Recent issues</h3><button class="btn btn-ghost btn-sm" data-goto="issues">View all</button>
+            </div>
+            <div class="panel-body" id="dashRecentIssues"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Recent activity</h3><span class="small-muted">Asset history</span>
+            </div>
+            <div class="panel-body" id="dashRecentActivity"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ASSETS -->
+      <section class="view" id="view-assets">
+        <div class="toolbar">
+          <div class="grow-search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <input type="text" id="assetSearch" placeholder="Search assets by name, code, or location…">
+          </div>
+          <select id="assetStatusFilter">
+            <option value="">All statuses</option>
+          </select>
+          <select id="assetCategoryFilter">
+            <option value="">All categories</option>
+          </select>
+          <button class="btn btn-accent" id="openAddAssetBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Register asset
+          </button>
+        </div>
+        <div class="asset-grid" id="assetGrid"></div>
+      </section>
+
+      <!-- ISSUES -->
+      <section class="view" id="view-issues">
+        <div class="toolbar">
+          <div class="grow-search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <input type="text" id="issueSearch" placeholder="Search issues by title, ID, or asset…">
+          </div>
+          <select id="issueStatusFilter">
+            <option value="">All statuses</option>
+          </select>
+          <select id="issuePriorityFilter">
+            <option value="">All priorities</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Issue</th>
+                <th>Asset</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Reported</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="issuesTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- =========================================================
      MODALS
      ========================================================= -->
 
-<!-- Add Asset -->
-<div class="overlay" id="modal-addAsset">
-  <div class="modal">
-    <div class="modal-head">
-      <div><h2>Register new asset</h2><div class="sub">Create a digital identity for a physical asset</div></div>
-      <button class="modal-close" data-close>&times;</button>
-    </div>
-    <form id="addAssetForm">
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="field" id="f-assetCode">
-            <label>Asset code *</label>
-            <input type="text" name="code" placeholder="e.g. PROJ-006" required>
-            <div class="field-error">This asset code already exists. Codes must be unique.</div>
-          </div>
-          <div class="field">
-            <label>Asset name *</label>
-            <input type="text" name="name" placeholder="e.g. Classroom Projector 06" required>
-          </div>
-          <div class="field">
-            <label>Category *</label>
-            <select name="category" required>
-              <option value="">Select category</option>
-              <option>Electronics</option><option>HVAC</option><option>Furniture</option>
-              <option>Plumbing</option><option>IT Equipment</option><option>Safety Equipment</option><option>Vehicle</option><option>Other</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Location *</label>
-            <input type="text" name="location" placeholder="e.g. Block A, Room 101" required>
-          </div>
-          <div class="field">
-            <label>Condition</label>
-            <select name="condition">
-              <option>Excellent</option><option>Good</option><option selected>Fair</option><option>Poor</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Last service date</label>
-            <input type="date" name="lastService">
-          </div>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
-        <button type="submit" class="btn btn-primary">Register asset</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Asset Detail -->
-<div class="overlay" id="modal-assetDetail">
-  <div class="modal wide">
-    <div class="modal-head">
-      <div>
-        <h2 id="ad-name">Asset name</h2>
-        <div class="sub"><span class="tag-code" id="ad-code" style="padding-left:0;"></span></div>
-      </div>
-      <button class="modal-close" data-close>&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="detail-grid">
+  <!-- Add Asset -->
+  <div class="overlay" id="modal-addAsset">
+    <div class="modal">
+      <div class="modal-head">
         <div>
-          <div id="ad-statusBadgeWrap"></div>
-          <div class="info-list">
-            <div class="item"><div class="k">Category</div><div class="v" id="ad-category"></div></div>
-            <div class="item"><div class="k">Location</div><div class="v" id="ad-location"></div></div>
-            <div class="item"><div class="k">Condition</div><div class="v" id="ad-condition"></div></div>
-            <div class="item"><div class="k">Last service</div><div class="v" id="ad-lastService"></div></div>
-            <div class="item"><div class="k">Next service</div><div class="v" id="ad-nextService"></div></div>
-            <div class="item"><div class="k">Registered</div><div class="v" id="ad-registered"></div></div>
-          </div>
-
-          <div class="tab-row">
-            <button class="tab-btn active" data-tab="issues">Issues</button>
-            <button class="tab-btn" data-tab="history">History</button>
-          </div>
-          <div class="tab-panel active" id="ad-tab-issues">
-            <div id="ad-issuesList"></div>
-          </div>
-          <div class="tab-panel" id="ad-tab-history">
-            <div class="timeline" id="ad-historyList"></div>
-          </div>
+          <h2>Register new asset</h2>
+          <div class="sub">Create a digital identity for a physical asset</div>
         </div>
-        <div>
-          <div class="qr-box">
-            <div id="qrcode-target"></div>
-            <div class="small-muted" style="margin-bottom:8px;">Scan to open public asset page</div>
-            <div class="qr-actions">
-              <button class="btn btn-ghost btn-sm" id="ad-openPublicBtn">Open public page</button>
-              <button class="btn btn-ghost btn-sm" id="ad-copyLinkBtn">Copy link</button>
-              <button class="btn btn-ghost btn-sm" id="ad-downloadQrBtn">Download QR</button>
+        <button class="modal-close" data-close>&times;</button>
+      </div>
+      <form id="addAssetForm">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field" id="f-assetCode">
+              <label>Asset code *</label>
+              <input type="text" name="code" placeholder="e.g. PROJ-006" required>
+              <div class="field-error">This asset code already exists. Codes must be unique.</div>
+            </div>
+            <div class="field">
+              <label>Asset name *</label>
+              <input type="text" name="name" placeholder="e.g. Classroom Projector 06" required>
+            </div>
+            <div class="field">
+              <label>Category *</label>
+              <select name="category" required>
+                <option value="">Select category</option>
+                <option>Electronics</option>
+                <option>HVAC</option>
+                <option>Furniture</option>
+                <option>Plumbing</option>
+                <option>IT Equipment</option>
+                <option>Safety Equipment</option>
+                <option>Vehicle</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Location *</label>
+              <input type="text" name="location" placeholder="e.g. Block A, Room 101" required>
+            </div>
+            <div class="field">
+              <label>Condition</label>
+              <select name="condition">
+                <option>Excellent</option>
+                <option>Good</option>
+                <option selected>Fair</option>
+                <option>Poor</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Last service date</label>
+              <input type="date" name="lastService">
             </div>
           </div>
-          <div style="margin-top:14px;">
-            <button class="btn btn-accent" style="width:100%; justify-content:center;" id="ad-reportIssueBtn">Report an issue</button>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">Register asset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Asset Detail -->
+  <div class="overlay" id="modal-assetDetail">
+    <div class="modal wide">
+      <div class="modal-head">
+        <div>
+          <h2 id="ad-name">Asset name</h2>
+          <div class="sub"><span class="tag-code" id="ad-code" style="padding-left:0;"></span></div>
+        </div>
+        <button class="modal-close" data-close>&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div>
+            <div id="ad-statusBadgeWrap"></div>
+            <div class="info-list">
+              <div class="item">
+                <div class="k">Category</div>
+                <div class="v" id="ad-category"></div>
+              </div>
+              <div class="item">
+                <div class="k">Location</div>
+                <div class="v" id="ad-location"></div>
+              </div>
+              <div class="item">
+                <div class="k">Condition</div>
+                <div class="v" id="ad-condition"></div>
+              </div>
+              <div class="item">
+                <div class="k">Last service</div>
+                <div class="v" id="ad-lastService"></div>
+              </div>
+              <div class="item">
+                <div class="k">Next service</div>
+                <div class="v" id="ad-nextService"></div>
+              </div>
+              <div class="item">
+                <div class="k">Registered</div>
+                <div class="v" id="ad-registered"></div>
+              </div>
+            </div>
+
+            <div class="tab-row">
+              <button class="tab-btn active" data-tab="issues">Issues</button>
+              <button class="tab-btn" data-tab="history">History</button>
+            </div>
+            <div class="tab-panel active" id="ad-tab-issues">
+              <div id="ad-issuesList"></div>
+            </div>
+            <div class="tab-panel" id="ad-tab-history">
+              <div class="timeline" id="ad-historyList"></div>
+            </div>
           </div>
-          <div style="margin-top:8px;" id="ad-retireWrap">
-            <button class="btn btn-danger btn-sm" style="width:100%; justify-content:center;" id="ad-retireBtn">Retire asset</button>
+          <div>
+            <div class="qr-box">
+              <div id="qrcode-target"></div>
+              <div class="small-muted" style="margin-bottom:8px;">Scan to open public asset page</div>
+              <div class="qr-actions">
+                <button class="btn btn-ghost btn-sm" id="ad-openPublicBtn">Open public page</button>
+                <button class="btn btn-ghost btn-sm" id="ad-copyLinkBtn">Copy link</button>
+                <button class="btn btn-ghost btn-sm" id="ad-downloadQrBtn">Download QR</button>
+              </div>
+            </div>
+            <div style="margin-top:14px;">
+              <button class="btn btn-accent" style="width:100%; justify-content:center;" id="ad-reportIssueBtn">Report
+                an issue</button>
+            </div>
+            <div style="margin-top:8px;" id="ad-retireWrap">
+              <button class="btn btn-danger btn-sm" style="width:100%; justify-content:center;" id="ad-retireBtn">Retire
+                asset</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Report Issue -->
-<div class="overlay" id="modal-reportIssue">
-  <div class="modal">
-    <div class="modal-head">
-      <div><h2>Report an issue</h2><div class="sub" id="ri-assetLabel">for asset</div></div>
-      <button class="modal-close" data-close>&times;</button>
+  <!-- Report Issue -->
+  <div class="overlay" id="modal-reportIssue">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h2>Report an issue</h2>
+          <div class="sub" id="ri-assetLabel">for asset</div>
+        </div>
+        <button class="modal-close" data-close>&times;</button>
+      </div>
+      <form id="reportIssueForm">
+        <div class="modal-body">
+          <div class="banner info">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="flex-shrink:0; margin-top:1px;">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            <span>Describe the problem in plain language. AI triage will suggest a title, category, priority, and
+              initial checks — you can edit everything before submitting.</span>
+          </div>
+          <div class="field">
+            <label>Describe the problem *</label>
+            <textarea name="description" required
+              placeholder="e.g. The projector display is flickering and sometimes does not detect HDMI."></textarea>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="runTriageBtn" style="margin-bottom:14px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path
+                d="M12 3v3M12 18v3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M3 12h3M18 12h3M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+            </svg>
+            Run AI Issue Triage
+          </button>
+          <div id="triageState"></div>
+          <div class="divider"></div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Title *</label>
+              <input type="text" name="title" required placeholder="Suggested title appears here">
+            </div>
+            <div class="field">
+              <label>Category *</label>
+              <select name="category" required>
+                <option value="">Select category</option>
+                <option>Electrical</option>
+                <option>Mechanical</option>
+                <option>Leakage / Performance</option>
+                <option>IT / Connectivity</option>
+                <option>Structural</option>
+                <option>Safety</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Priority *</label>
+              <select name="priority" required>
+                <option value="">Select priority</option>
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+                <option>Critical</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Reporter name *</label>
+              <input type="text" name="reporter" required placeholder="Your name">
+            </div>
+          </div>
+          <div class="field">
+            <label>Possible causes <span class="hint">(AI-suggested, editable)</span></label>
+            <textarea name="causes" placeholder="Possible causes will appear here"></textarea>
+          </div>
+          <div class="field">
+            <label>Initial diagnostic checks <span class="hint">(AI-suggested, editable)</span></label>
+            <textarea name="checks" placeholder="Initial checks will appear here"></textarea>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit issue</button>
+        </div>
+      </form>
     </div>
-    <form id="reportIssueForm">
+  </div>
+
+  <!-- Issue Detail / Workflow -->
+  <div class="overlay" id="modal-issueDetail">
+    <div class="modal wide">
+      <div class="modal-head">
+        <div>
+          <h2 id="id-title">Issue title</h2>
+          <div class="sub"><span class="issue-id" id="id-issueNo"></span> · <span id="id-assetName"></span></div>
+        </div>
+        <button class="modal-close" data-close>&times;</button>
+      </div>
       <div class="modal-body">
-        <div class="banner info">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          <span>Describe the problem in plain language. AI triage will suggest a title, category, priority, and initial checks — you can edit everything before submitting.</span>
+        <div style="display:flex; gap:10px; margin-bottom:14px;">
+          <div id="id-statusBadge"></div>
+          <div id="id-priorityChip"></div>
         </div>
-        <div class="field">
-          <label>Describe the problem *</label>
-          <textarea name="description" required placeholder="e.g. The projector display is flickering and sometimes does not detect HDMI."></textarea>
+        <div class="info-list">
+          <div class="item">
+            <div class="k">Category</div>
+            <div class="v" id="id-category"></div>
+          </div>
+          <div class="item">
+            <div class="k">Reporter</div>
+            <div class="v" id="id-reporter"></div>
+          </div>
+          <div class="item">
+            <div class="k">Reported on</div>
+            <div class="v" id="id-date"></div>
+          </div>
+          <div class="item">
+            <div class="k">Assigned to</div>
+            <div class="v" id="id-assignee"></div>
+          </div>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" id="runTriageBtn" style="margin-bottom:14px;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3M12 18v3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M3 12h3M18 12h3M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
-          Run AI Issue Triage
-        </button>
-        <div id="triageState"></div>
+        <div class="section-title">Description</div>
+        <p id="id-description" style="font-size:13.5px; line-height:1.5;"></p>
+        <div class="section-title">Possible causes</div>
+        <p id="id-causes" style="font-size:13.5px; line-height:1.5;"></p>
+        <div class="section-title">Initial checks</div>
+        <p id="id-checks" style="font-size:13.5px; line-height:1.5;"></p>
+
         <div class="divider"></div>
+        <div class="section-title" style="margin-top:0;">Workflow</div>
         <div class="form-grid">
           <div class="field">
-            <label>Title *</label>
-            <input type="text" name="title" required placeholder="Suggested title appears here">
+            <label>Update status</label>
+            <select id="id-statusSelect"></select>
           </div>
           <div class="field">
-            <label>Category *</label>
-            <select name="category" required>
-              <option value="">Select category</option>
-              <option>Electrical</option><option>Mechanical</option><option>Leakage / Performance</option>
-              <option>IT / Connectivity</option><option>Structural</option><option>Safety</option><option>Other</option>
-            </select>
+            <label>Assign technician</label>
+            <input type="text" id="id-assigneeInput" placeholder="Technician name">
+          </div>
+        </div>
+
+        <div id="id-maintenanceFields" style="display:none;">
+          <div class="banner warn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="flex-shrink:0; margin-top:1px;">
+              <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+              <path d="M12 9v4M12 17h.01" />
+            </svg>
+            <span>Resolving an issue requires a maintenance note. Next service date cannot be before the completion
+              date, and cost cannot be negative.</span>
           </div>
           <div class="field">
-            <label>Priority *</label>
-            <select name="priority" required>
-              <option value="">Select priority</option>
-              <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
-            </select>
+            <label>Maintenance note *</label>
+            <textarea id="id-maintNote"
+              placeholder="Inspection findings, work performed, condition after repair…"></textarea>
           </div>
-          <div class="field">
-            <label>Reporter name *</label>
-            <input type="text" name="reporter" required placeholder="Your name">
+          <div class="form-grid">
+            <div class="field">
+              <label>Parts replaced</label>
+              <input type="text" id="id-maintParts" placeholder="e.g. HDMI cable">
+            </div>
+            <div class="field">
+              <label>Cost</label>
+              <input type="number" id="id-maintCost" min="0" step="0.01" placeholder="0.00">
+            </div>
+            <div class="field">
+              <label>Completion date</label>
+              <input type="date" id="id-maintDate">
+            </div>
+            <div class="field">
+              <label>Next service date</label>
+              <input type="date" id="id-nextServiceDate">
+            </div>
           </div>
         </div>
-        <div class="field">
-          <label>Possible causes <span class="hint">(AI-suggested, editable)</span></label>
-          <textarea name="causes" placeholder="Possible causes will appear here"></textarea>
-        </div>
-        <div class="field">
-          <label>Initial diagnostic checks <span class="hint">(AI-suggested, editable)</span></label>
-          <textarea name="checks" placeholder="Initial checks will appear here"></textarea>
-        </div>
+        <div id="id-formError" class="banner danger" style="display:none;"></div>
       </div>
       <div class="modal-foot">
-        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
-        <button type="submit" class="btn btn-primary">Submit issue</button>
+        <button type="button" class="btn btn-ghost" data-close>Close</button>
+        <button type="button" class="btn btn-primary" id="id-saveBtn">Save update</button>
       </div>
-    </form>
-  </div>
-</div>
-
-<!-- Issue Detail / Workflow -->
-<div class="overlay" id="modal-issueDetail">
-  <div class="modal wide">
-    <div class="modal-head">
-      <div>
-        <h2 id="id-title">Issue title</h2>
-        <div class="sub"><span class="issue-id" id="id-issueNo"></span> · <span id="id-assetName"></span></div>
-      </div>
-      <button class="modal-close" data-close>&times;</button>
-    </div>
-    <div class="modal-body">
-      <div style="display:flex; gap:10px; margin-bottom:14px;">
-        <div id="id-statusBadge"></div>
-        <div id="id-priorityChip"></div>
-      </div>
-      <div class="info-list">
-        <div class="item"><div class="k">Category</div><div class="v" id="id-category"></div></div>
-        <div class="item"><div class="k">Reporter</div><div class="v" id="id-reporter"></div></div>
-        <div class="item"><div class="k">Reported on</div><div class="v" id="id-date"></div></div>
-        <div class="item"><div class="k">Assigned to</div><div class="v" id="id-assignee"></div></div>
-      </div>
-      <div class="section-title">Description</div>
-      <p id="id-description" style="font-size:13.5px; line-height:1.5;"></p>
-      <div class="section-title">Possible causes</div>
-      <p id="id-causes" style="font-size:13.5px; line-height:1.5;"></p>
-      <div class="section-title">Initial checks</div>
-      <p id="id-checks" style="font-size:13.5px; line-height:1.5;"></p>
-
-      <div class="divider"></div>
-      <div class="section-title" style="margin-top:0;">Workflow</div>
-      <div class="form-grid">
-        <div class="field">
-          <label>Update status</label>
-          <select id="id-statusSelect"></select>
-        </div>
-        <div class="field">
-          <label>Assign technician</label>
-          <input type="text" id="id-assigneeInput" placeholder="Technician name">
-        </div>
-      </div>
-
-      <div id="id-maintenanceFields" style="display:none;">
-        <div class="banner warn">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px;"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
-          <span>Resolving an issue requires a maintenance note. Next service date cannot be before the completion date, and cost cannot be negative.</span>
-        </div>
-        <div class="field">
-          <label>Maintenance note *</label>
-          <textarea id="id-maintNote" placeholder="Inspection findings, work performed, condition after repair…"></textarea>
-        </div>
-        <div class="form-grid">
-          <div class="field">
-            <label>Parts replaced</label>
-            <input type="text" id="id-maintParts" placeholder="e.g. HDMI cable">
-          </div>
-          <div class="field">
-            <label>Cost</label>
-            <input type="number" id="id-maintCost" min="0" step="0.01" placeholder="0.00">
-          </div>
-          <div class="field">
-            <label>Completion date</label>
-            <input type="date" id="id-maintDate">
-          </div>
-          <div class="field">
-            <label>Next service date</label>
-            <input type="date" id="id-nextServiceDate">
-          </div>
-        </div>
-      </div>
-      <div id="id-formError" class="banner danger" style="display:none;"></div>
-    </div>
-    <div class="modal-foot">
-      <button type="button" class="btn btn-ghost" data-close>Close</button>
-      <button type="button" class="btn btn-primary" id="id-saveBtn">Save update</button>
     </div>
   </div>
-</div>
 
-<script>
-/* =========================================================
-   MaintainIQ — Track C frontend prototype
-   Vanilla JS + localStorage persistence. No backend required.
-   ========================================================= */
-
-const STORAGE_KEY = 'maintainiq_data_v1';
-
-const ASSET_STATUSES = ['Operational','Issue Reported','Under Inspection','Under Maintenance','Out of Service','Retired'];
-const ISSUE_STATUSES  = ['Reported','Assigned','Inspection Started','Maintenance In Progress','Waiting for Parts','Resolved','Closed','Reopened'];
-const PRIORITIES = ['Low','Medium','High','Critical'];
-
-/* Maps an issue status to the asset status it should drive (business rule table in the brief) */
-const ISSUE_TO_ASSET_STATUS = {
-  'Reported':'Issue Reported',
-  'Assigned':'Issue Reported',
-  'Inspection Started':'Under Inspection',
-  'Maintenance In Progress':'Under Maintenance',
-  'Waiting for Parts':'Under Maintenance',
-  'Resolved':'Operational',
-  'Closed':'Operational',
-  'Reopened':'Issue Reported'
-};
-
-/* -----------------------------------------------------------
-   Demo seed data — at least five preloaded assets, per brief
-   ----------------------------------------------------------- */
-function seedData(){
-  const now = Date.now();
-  const daysAgo = d => new Date(now - d*86400000).toISOString().slice(0,10);
-
-  const assets = [
-    {code:'PROJ-001', name:'Classroom Projector 01', category:'Electronics', location:'Block A, Room 101', condition:'Good', status:'Operational', lastService:daysAgo(40), nextService:daysAgo(-50), createdAt:daysAgo(120)},
-    {code:'AC-014',   name:'Split AC Unit — Lab 3', category:'HVAC', location:'Block C, Lab 3', condition:'Fair', status:'Operational', lastService:daysAgo(20), nextService:daysAgo(-70), createdAt:daysAgo(200)},
-    {code:'GEN-002',  name:'Backup Generator', category:'Electronics', location:'Utility Yard', condition:'Good', status:'Operational', lastService:daysAgo(10), nextService:daysAgo(-80), createdAt:daysAgo(300)},
-    {code:'FURN-118', name:'Lecture Hall Chairs (Set B)', category:'Furniture', location:'Block B, Hall 2', condition:'Poor', status:'Out of Service', lastService:daysAgo(200), nextService:daysAgo(-5), createdAt:daysAgo(400)},
-    {code:'PUMP-007', name:'Water Pump — Rooftop Tank', category:'Plumbing', location:'Rooftop, Block A', condition:'Fair', status:'Operational', lastService:daysAgo(55), nextService:daysAgo(-35), createdAt:daysAgo(250)},
-    {code:'CCTV-023', name:'Corridor CCTV Camera', category:'Safety Equipment', location:'Block D, 2nd Floor', condition:'Excellent', status:'Retired', lastService:daysAgo(300), nextService:daysAgo(-999), createdAt:daysAgo(500)}
-  ];
-
-  const issues = [
-    {
-      id:'ISS-1001', assetCode:'AC-014', title:'Water leakage and reduced cooling', category:'Leakage / Performance',
-      priority:'High', status:'Maintenance In Progress', reporter:'Ali Raza', assignee:'Tech: Bilal',
-      description:'The AC is leaking water, making unusual noise, and cooling is weak.',
-      causes:'Blocked drain pipe, dirty filter, frozen coil.',
-      checks:'Turn off the unit if water is near electrical wiring; inspect drainage; check filter condition.',
-      reportedAt:daysAgo(3), maintenance:null
-    },
-    {
-      id:'ISS-1002', assetCode:'FURN-118', title:'Multiple chairs structurally unsafe', category:'Structural',
-      priority:'Critical', status:'Reported', reporter:'Sana Iqbal', assignee:'',
-      description:'Several chairs in Hall 2 have broken frames and are unsafe to sit on.',
-      causes:'Wear from prolonged use; welded joints failing.',
-      checks:'Cordon off affected chairs; inspect all units in the set before reuse.',
-      reportedAt:daysAgo(1), maintenance:null
-    },
-    {
-      id:'ISS-1003', assetCode:'PROJ-001', title:'Bulb dimming intermittently', category:'Electrical',
-      priority:'Medium', status:'Resolved', reporter:'Hina Shaikh', assignee:'Tech: Bilal',
-      description:'Projector bulb dims occasionally during long sessions.',
-      causes:'Aging bulb; ventilation dust buildup.',
-      checks:'Clean air filter; check bulb hours; verify ventilation is unobstructed.',
-      reportedAt:daysAgo(15),
-      maintenance:{note:'Cleaned internal vents and dust filter. Bulb tested stable across 2-hour session.', parts:'None', cost:0, date:daysAgo(12), nextService:daysAgo(-50)}
-    }
-  ];
-
-  const history = [];
-  assets.forEach(a=>{
-    history.push({assetCode:a.code, actor:'Administrator', action:'Asset registered', issueId:null, at:a.createdAt});
-  });
-  issues.forEach(i=>{
-    history.push({assetCode:i.assetCode, actor:i.reporter, action:`Issue reported: ${i.title}`, issueId:i.id, at:i.reportedAt});
-    if(i.maintenance){
-      history.push({assetCode:i.assetCode, actor:i.assignee||'Technician', action:`Issue resolved — ${i.maintenance.note}`, issueId:i.id, at:i.maintenance.date});
-    } else if(i.status !== 'Reported'){
-      history.push({assetCode:i.assetCode, actor:i.assignee||'Technician', action:`Status updated to ${i.status}`, issueId:i.id, at:i.reportedAt});
-    }
-  });
-
-  return {assets, issues, history, issueSeq: 1004};
-}
-
-let db = loadData();
-
-function loadData(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw) return JSON.parse(raw);
-  }catch(e){ /* fall through to fresh seed */ }
-  const fresh = seedData();
-  saveData(fresh);
-  return fresh;
-}
-function saveData(data){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-function persist(){ saveData(db); }
-
-/* -----------------------------------------------------------
-   Utilities
-   ----------------------------------------------------------- */
-function slug(s){ return s.replace(/\s+/g,'-'); }
-function fmtDate(d){
-  if(!d) return '—';
-  const dt = new Date(d);
-  if(isNaN(dt)) return d;
-  return dt.toLocaleDateString(undefined,{year:'numeric', month:'short', day:'numeric'});
-}
-function todayISO(){ return new Date().toISOString().slice(0,10); }
-function getAsset(code){ return db.assets.find(a=>a.code===code); }
-function getIssue(id){ return db.issues.find(i=>i.id===id); }
-function assetIssues(code){ return db.issues.filter(i=>i.assetCode===code).sort((a,b)=> b.reportedAt.localeCompare(a.reportedAt)); }
-function assetHistory(code){ return db.history.filter(h=>h.assetCode===code).sort((a,b)=> b.at.localeCompare(a.at)); }
-function addHistory(assetCode, actor, action, issueId=null){
-  db.history.push({assetCode, actor, action, issueId, at: todayISO()});
-}
-function toast(msg, isErr=false){
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'show' + (isErr?' err':'');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(()=> t.className = t.className.replace('show','').trim(), 2600);
-}
-function publicUrlFor(code){
-  const base = location.href.split('#')[0];
-  return `${base}#/asset/${encodeURIComponent(code)}`;
-}
-
-/* =========================================================
-   RENDERING
-   ========================================================= */
-
-function populateFilterOptions(){
-  const statusSel = document.getElementById('assetStatusFilter');
-  statusSel.innerHTML = '<option value="">All statuses</option>' + ASSET_STATUSES.map(s=>`<option>${s}</option>`).join('');
-
-  const cats = [...new Set(db.assets.map(a=>a.category))].sort();
-  const catSel = document.getElementById('assetCategoryFilter');
-  catSel.innerHTML = '<option value="">All categories</option>' + cats.map(c=>`<option>${c}</option>`).join('');
-
-  const issueStatusSel = document.getElementById('issueStatusFilter');
-  issueStatusSel.innerHTML = '<option value="">All statuses</option>' + ISSUE_STATUSES.map(s=>`<option>${s}</option>`).join('');
-
-  const priSel = document.getElementById('issuePriorityFilter');
-  priSel.innerHTML = '<option value="">All priorities</option>' + PRIORITIES.map(p=>`<option>${p}</option>`).join('');
-}
-
-function renderDashboard(){
-  document.getElementById('statTotalAssets').textContent = db.assets.length;
-  const openIssues = db.issues.filter(i=> !['Resolved','Closed'].includes(i.status));
-  document.getElementById('statOpenIssues').textContent = openIssues.length;
-  document.getElementById('statCritical').textContent = db.issues.filter(i=>i.priority==='Critical' && !['Resolved','Closed'].includes(i.status)).length;
-  document.getElementById('statOutOfService').textContent = db.assets.filter(a=>a.status==='Out of Service').length;
-
-  const recentIssues = [...db.issues].sort((a,b)=> b.reportedAt.localeCompare(a.reportedAt)).slice(0,5);
-  const riWrap = document.getElementById('dashRecentIssues');
-  riWrap.innerHTML = recentIssues.length ? recentIssues.map(i=>{
-    const a = getAsset(i.assetCode);
-    return `<div class="row-item clickable" onclick="openIssueDetail('${i.id}')">
-      <div class="grow"><p><strong>${escapeHtml(i.title)}</strong></p><p class="meta">${a?escapeHtml(a.name):i.assetCode} · ${fmtDate(i.reportedAt)}</p></div>
-      <span class="badge issue-${slug(i.status)}">${i.status}</span>
-    </div>`;
-  }).join('') : `<div class="empty-row">No issues reported yet.</div>`;
-
-  const recentHist = [...db.history].sort((a,b)=> b.at.localeCompare(a.at)).slice(0,6);
-  const haWrap = document.getElementById('dashRecentActivity');
-  haWrap.innerHTML = recentHist.length ? recentHist.map(h=>{
-    const a = getAsset(h.assetCode);
-    return `<div class="row-item">
-      <div class="grow"><p>${escapeHtml(h.action)}</p><p class="meta">${a?escapeHtml(a.name):h.assetCode} · ${h.actor} · ${fmtDate(h.at)}</p></div>
-    </div>`;
-  }).join('') : `<div class="empty-row">No activity recorded yet.</div>`;
-}
-
-function renderAssets(){
-  const q = (document.getElementById('assetSearch').value||'').toLowerCase();
-  const statusF = document.getElementById('assetStatusFilter').value;
-  const catF = document.getElementById('assetCategoryFilter').value;
-
-  let list = db.assets.filter(a=>{
-    const matchesQ = !q || a.name.toLowerCase().includes(q) || a.code.toLowerCase().includes(q) || a.location.toLowerCase().includes(q);
-    const matchesStatus = !statusF || a.status===statusF;
-    const matchesCat = !catF || a.category===catF;
-    return matchesQ && matchesStatus && matchesCat;
-  }).sort((a,b)=> a.name.localeCompare(b.name));
-
-  const grid = document.getElementById('assetGrid');
-  if(!list.length){
-    grid.innerHTML = `<div class="empty-row" style="grid-column:1/-1;">No assets match your search or filters.</div>`;
-    return;
-  }
-  grid.innerHTML = list.map(a=>{
-    const openCount = assetIssues(a.code).filter(i=>!['Resolved','Closed'].includes(i.status)).length;
-    return `<div class="tag-card" onclick="openAssetDetail('${a.code}')">
-      <div class="tag-card-head"><span class="badge status-${slug(a.status)}">${a.status}</span></div>
-      <h4>${escapeHtml(a.name)}</h4>
-      <div class="tag-code">${a.code}</div>
-      <div class="tag-meta">
-        <span class="pill">${escapeHtml(a.category)}</span>
-        <span class="pill">${escapeHtml(a.location)}</span>
-      </div>
-      <div class="tag-card-foot">
-        <span class="small-muted">${openCount} open issue${openCount===1?'':'s'}</span>
-        <span class="small-muted">Next svc ${fmtDate(a.nextService)}</span>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function renderIssues(){
-  const q = (document.getElementById('issueSearch').value||'').toLowerCase();
-  const statusF = document.getElementById('issueStatusFilter').value;
-  const priF = document.getElementById('issuePriorityFilter').value;
-
-  let list = db.issues.filter(i=>{
-    const a = getAsset(i.assetCode);
-    const matchesQ = !q || i.title.toLowerCase().includes(q) || i.id.toLowerCase().includes(q) || (a&&a.name.toLowerCase().includes(q));
-    const matchesStatus = !statusF || i.status===statusF;
-    const matchesPri = !priF || i.priority===priF;
-    return matchesQ && matchesStatus && matchesPri;
-  }).sort((a,b)=> b.reportedAt.localeCompare(a.reportedAt));
-
-  const body = document.getElementById('issuesTableBody');
-  if(!list.length){
-    body.innerHTML = `<tr><td colspan="6" class="empty-row">No issues match your search or filters.</td></tr>`;
-    return;
-  }
-  body.innerHTML = list.map(i=>{
-    const a = getAsset(i.assetCode);
-    return `<tr class="clickable" onclick="openIssueDetail('${i.id}')">
-      <td><strong>${escapeHtml(i.title)}</strong><br><span class="issue-id">${i.id}</span></td>
-      <td>${a?escapeHtml(a.name):i.assetCode}</td>
-      <td><span class="priority-chip priority-${i.priority}">${i.priority}</span></td>
-      <td><span class="badge issue-${slug(i.status)}">${i.status}</span></td>
-      <td>${fmtDate(i.reportedAt)}</td>
-      <td><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></td>
-    </tr>`;
-  }).join('');
-}
-
-function escapeHtml(s){
-  const div = document.createElement('div');
-  div.textContent = s==null? '' : String(s);
-  return div.innerHTML;
-}
-
-function renderAll(){
-  populateFilterOptions();
-  renderDashboard();
-  renderAssets();
-  renderIssues();
-}
-
-/* =========================================================
-   NAVIGATION
-   ========================================================= */
-const viewTitles = {
-  dashboard:['Dashboard','Overview of assets and open work'],
-  assets:['Assets','Register, search, and inspect every asset'],
-  issues:['Issues','Track reported problems through resolution']
-};
-function showView(name){
-  document.querySelectorAll('.nav-item').forEach(b=> b.classList.toggle('active', b.dataset.view===name));
-  document.querySelectorAll('.view').forEach(v=> v.classList.toggle('active', v.id==='view-'+name));
-  document.getElementById('topbarTitle').textContent = viewTitles[name][0];
-  document.getElementById('topbarSub').textContent = viewTitles[name][1];
-  document.getElementById('sidebar').classList.remove('open');
-}
-document.querySelectorAll('.nav-item').forEach(b=> b.addEventListener('click', ()=> showView(b.dataset.view)));
-document.querySelectorAll('[data-goto]').forEach(b=> b.addEventListener('click', ()=> showView(b.dataset.goto)));
-document.getElementById('hamburgerBtn').addEventListener('click', ()=> document.getElementById('sidebar').classList.toggle('open'));
-
-/* =========================================================
-   MODAL HELPERS
-   ========================================================= */
-function openModal(id){ document.getElementById(id).classList.add('active'); }
-function closeModal(id){ document.getElementById(id).classList.remove('active'); }
-document.querySelectorAll('[data-close]').forEach(b=>{
-  b.addEventListener('click', (e)=>{
-    const overlay = e.target.closest('.overlay');
-    overlay.classList.remove('active');
-  });
-});
-document.querySelectorAll('.overlay').forEach(o=>{
-  o.addEventListener('click', (e)=>{ if(e.target===o) o.classList.remove('active'); });
-});
-document.addEventListener('keydown', (e)=>{
-  if(e.key==='Escape') document.querySelectorAll('.overlay.active').forEach(o=>o.classList.remove('active'));
-});
-
-/* =========================================================
-   ADD ASSET
-   ========================================================= */
-document.getElementById('openAddAssetBtn').addEventListener('click', ()=>{
-  document.getElementById('addAssetForm').reset();
-  document.getElementById('f-assetCode').classList.remove('error');
-  openModal('modal-addAsset');
-});
-document.getElementById('addAssetForm').addEventListener('submit', (e)=>{
-  e.preventDefault();
-  const fd = new FormData(e.target);
-  const code = fd.get('code').trim().toUpperCase();
-  const codeField = document.getElementById('f-assetCode');
-
-  if(db.assets.some(a=>a.code.toUpperCase()===code)){
-    codeField.classList.add('error');
-    return;
-  }
-  codeField.classList.remove('error');
-
-  const asset = {
-    code, name: fd.get('name').trim(), category: fd.get('category'),
-    location: fd.get('location').trim(), condition: fd.get('condition'),
-    status:'Operational', lastService: fd.get('lastService')||'', nextService:'',
-    createdAt: todayISO()
-  };
-  db.assets.push(asset);
-  addHistory(code, 'Administrator', 'Asset registered');
-  persist();
-  renderAll();
-  closeModal('modal-addAsset');
-  toast(`Asset ${code} registered successfully.`);
-});
-
-/* =========================================================
-   ASSET DETAIL + QR
-   ========================================================= */
-let currentAssetCode = null;
-
-window.openAssetDetail = function(code){
-  currentAssetCode = code;
-  const a = getAsset(code);
-  if(!a) return;
-
-  document.getElementById('ad-name').textContent = a.name;
-  document.getElementById('ad-code').textContent = a.code;
-  document.getElementById('ad-statusBadgeWrap').innerHTML = `<span class="badge status-${slug(a.status)}">${a.status}</span>`;
-  document.getElementById('ad-category').textContent = a.category;
-  document.getElementById('ad-location').textContent = a.location;
-  document.getElementById('ad-condition').textContent = a.condition;
-  document.getElementById('ad-lastService').textContent = fmtDate(a.lastService);
-  document.getElementById('ad-nextService').textContent = fmtDate(a.nextService);
-  document.getElementById('ad-registered').textContent = fmtDate(a.createdAt);
-
-  // issues tab
-  const issues = assetIssues(code);
-  document.getElementById('ad-issuesList').innerHTML = issues.length ? issues.map(i=>`
-    <div class="row-item clickable" onclick="closeModal('modal-assetDetail'); openIssueDetail('${i.id}')">
-      <div class="grow"><p><strong>${escapeHtml(i.title)}</strong></p><p class="meta">${i.id} · ${fmtDate(i.reportedAt)}</p></div>
-      <span class="badge issue-${slug(i.status)}">${i.status}</span>
-    </div>`).join('') : `<div class="empty-row">No issues reported for this asset.</div>`;
-
-  // history tab
-  const hist = assetHistory(code);
-  document.getElementById('ad-historyList').innerHTML = hist.length ? hist.map(h=>`
-    <div class="timeline-item">
-      <div class="timeline-dot"></div>
-      <div class="body"><div class="action">${escapeHtml(h.action)}</div><div class="meta">${h.actor} · ${fmtDate(h.at)}</div></div>
-    </div>`).join('') : `<div class="empty-row">No history yet.</div>`;
-
-  // reset tabs
-  document.querySelectorAll('#modal-assetDetail .tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab==='issues'));
-  document.getElementById('ad-tab-issues').classList.add('active');
-  document.getElementById('ad-tab-history').classList.remove('active');
-
-  // QR
-  document.getElementById('qrcode-target').innerHTML = '';
-  const url = publicUrlFor(a.code);
-  new QRCode(document.getElementById('qrcode-target'), {text:url, width:120, height:120, colorDark:'#161F2B', colorLight:'#ffffff'});
-
-  // retire button visibility
-  document.getElementById('ad-retireWrap').style.display = a.status==='Retired' ? 'none' : 'block';
-
-  openModal('modal-assetDetail');
-};
-
-document.querySelectorAll('#modal-assetDetail .tab-btn').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('#modal-assetDetail .tab-btn').forEach(b=>b.classList.toggle('active', b===btn));
-    document.getElementById('ad-tab-issues').classList.toggle('active', btn.dataset.tab==='issues');
-    document.getElementById('ad-tab-history').classList.toggle('active', btn.dataset.tab==='history');
-  });
-});
-
-document.getElementById('ad-openPublicBtn').addEventListener('click', ()=>{
-  location.hash = `/asset/${encodeURIComponent(currentAssetCode)}`;
-});
-document.getElementById('ad-copyLinkBtn').addEventListener('click', ()=>{
-  const url = publicUrlFor(currentAssetCode);
-  navigator.clipboard?.writeText(url).then(()=> toast('Public link copied to clipboard.'))
-    .catch(()=> toast('Could not copy link.', true));
-});
-document.getElementById('ad-downloadQrBtn').addEventListener('click', ()=>{
-  const canvas = document.querySelector('#qrcode-target canvas');
-  if(!canvas){ toast('QR code not ready yet.', true); return; }
-  const link = document.createElement('a');
-  link.download = `${currentAssetCode}-qr.png`;
-  link.href = canvas.toDataURL('image/png');
-  link.click();
-});
-document.getElementById('ad-retireBtn').addEventListener('click', ()=>{
-  const a = getAsset(currentAssetCode);
-  if(!a) return;
-  if(!confirm(`Retire asset ${a.code}? This marks it as permanently removed from service.`)) return;
-  a.status = 'Retired';
-  addHistory(a.code, 'Administrator', 'Asset retired');
-  persist();
-  renderAll();
-  openAssetDetail(a.code);
-  toast(`Asset ${a.code} retired.`);
-});
-document.getElementById('ad-reportIssueBtn').addEventListener('click', ()=>{
-  closeModal('modal-assetDetail');
-  openReportIssue(currentAssetCode);
-});
-
-/* =========================================================
-   REPORT ISSUE + simple AI TRIAGE simulation
-   ========================================================= */
-let reportForAssetCode = null;
-
-function openReportIssue(code){
-  reportForAssetCode = code;
-  const a = getAsset(code);
-  document.getElementById('reportIssueForm').reset();
-  document.getElementById('ri-assetLabel').textContent = `for ${a ? a.name+' ('+a.code+')' : code}`;
-  document.getElementById('triageState').innerHTML = '';
-  openModal('modal-reportIssue');
-}
-window.openReportIssue = openReportIssue;
-
-/*
-  AI Issue Triage — simulated locally so the prototype works fully offline.
-  In the Advanced track this call goes to a real LLM; here it demonstrates
-  the same product behaviour: natural language in, structured fields out,
-  fully editable before submit, with loading + fallback states.
-*/
-function simulateAiTriage(description, asset){
-  const text = description.toLowerCase();
-  const rules = [
-    {kw:['leak','water','drip'], title:'Water leakage detected', category:'Leakage / Performance', priority:'High',
-      causes:'Blocked drain line, worn seal, or condensation buildup.',
-      checks:'Power off if water is near electrical wiring; inspect drainage path; check surrounding area for damage.'},
-    {kw:['spark','shock','smoke','electrical','wiring'], title:'Electrical fault reported', category:'Electrical', priority:'Critical',
-      causes:'Damaged wiring, loose connection, or overloaded circuit.',
-      checks:'Disconnect power immediately; do not operate; keep area clear until inspected by a qualified technician.'},
-    {kw:['noise','vibration','rattl'], title:'Unusual noise or vibration', category:'Mechanical', priority:'Medium',
-      causes:'Loose mounting, worn bearing, or foreign object interference.',
-      checks:'Observe from a safe distance; note when the noise occurs; avoid forcing the unit to continue operating.'},
-    {kw:['hdmi','display','flicker','screen','projector','connect'], title:'Display or connectivity fault', category:'IT / Connectivity', priority:'Medium',
-      causes:'Loose cable connection, damaged port, or failing display component.',
-      checks:'Reseat all cables; test with an alternative source device; check for visible port damage.'},
-    {kw:['crack','broken','unsafe','structural','collapse'], title:'Structural damage reported', category:'Structural', priority:'Critical',
-      causes:'Material fatigue, impact damage, or manufacturing defect.',
-      checks:'Restrict access to the asset immediately; do not use until inspected by a qualified technician.'},
-    {kw:['cool','ac ','a/c','hvac','temperature','hot'], title:'Cooling performance issue', category:'Leakage / Performance', priority:'High',
-      causes:'Dirty filter, low refrigerant, or blocked airflow.',
-      checks:'Check and clean filters; ensure vents are unobstructed; monitor temperature over 30 minutes.'}
-  ];
-  const match = rules.find(r=> r.kw.some(k=> text.includes(k)));
-  const base = match || {title:'Maintenance issue reported', category:'Other', priority:'Medium',
-    causes:'Cause to be confirmed on technician inspection.',
-    checks:'Perform a visual inspection and confirm the asset is safe to keep in operation.'};
-
-  return {
-    title: `${base.title}${asset? ' — '+asset.name : ''}`.slice(0,80),
-    category: base.category,
-    priority: base.priority,
-    causes: base.causes,
-    checks: base.checks
-  };
-}
-
-document.getElementById('runTriageBtn').addEventListener('click', ()=>{
-  const form = document.getElementById('reportIssueForm');
-  const desc = form.description.value.trim();
-  const stateEl = document.getElementById('triageState');
-
-  if(desc.length < 8){
-    stateEl.innerHTML = `<div class="banner danger">Please describe the problem in a bit more detail before running AI triage.</div>`;
-    return;
-  }
-
-  stateEl.innerHTML = `<div class="banner info">Analyzing complaint and asset context…</div>`;
-  const btn = document.getElementById('runTriageBtn');
-  btn.disabled = true;
-
-  // Simulated latency + graceful timeout/fallback handling, per AI quality requirements.
-  const timeout = setTimeout(()=>{
-    stateEl.innerHTML = `<div class="banner danger">AI triage timed out. You can fill in the fields manually below.</div>`;
-    btn.disabled = false;
-  }, 6000);
-
-  setTimeout(()=>{
-    clearTimeout(timeout);
-    try{
-      const asset = getAsset(reportForAssetCode);
-      const result = simulateAiTriage(desc, asset);
-      form.title.value = result.title;
-      form.category.value = result.category;
-      form.priority.value = result.priority;
-      form.causes.value = result.causes;
-      form.checks.value = result.checks;
-      const safetyNote = (result.priority==='Critical')
-        ? ` This looks safety-critical — a qualified technician should assess it before the asset is used.`
-        : '';
-      stateEl.innerHTML = `<div class="banner info">AI suggestions added below. Review and edit before submitting.${safetyNote}</div>`;
-    }catch(err){
-      stateEl.innerHTML = `<div class="banner danger">AI triage is unavailable right now. Please fill in the fields manually.</div>`;
-    }
-    btn.disabled = false;
-  }, 700);
-});
-
-document.getElementById('reportIssueForm').addEventListener('submit', (e)=>{
-  e.preventDefault();
-  const fd = new FormData(e.target);
-  const asset = getAsset(reportForAssetCode);
-  if(!asset) return;
-
-  const issue = {
-    id: `ISS-${db.issueSeq++}`,
-    assetCode: asset.code,
-    title: fd.get('title').trim(),
-    category: fd.get('category'),
-    priority: fd.get('priority'),
-    status:'Reported',
-    reporter: fd.get('reporter').trim(),
-    assignee:'',
-    description: fd.get('description').trim(),
-    causes: fd.get('causes').trim(),
-    checks: fd.get('checks').trim(),
-    reportedAt: todayISO(),
-    maintenance: null
-  };
-  db.issues.push(issue);
-  asset.status = 'Issue Reported';
-  addHistory(asset.code, issue.reporter, `Issue reported: ${issue.title}`, issue.id);
-  persist();
-  renderAll();
-  closeModal('modal-reportIssue');
-  toast(`Issue ${issue.id} submitted.`);
-});
-
-/* =========================================================
-   ISSUE DETAIL + WORKFLOW
-   ========================================================= */
-let currentIssueId = null;
-
-window.openIssueDetail = function(id){
-  currentIssueId = id;
-  const i = getIssue(id);
-  if(!i) return;
-  const a = getAsset(i.assetCode);
-
-  document.getElementById('id-title').textContent = i.title;
-  document.getElementById('id-issueNo').textContent = i.id;
-  document.getElementById('id-assetName').textContent = a ? a.name : i.assetCode;
-  document.getElementById('id-statusBadge').innerHTML = `<span class="badge issue-${slug(i.status)}">${i.status}</span>`;
-  document.getElementById('id-priorityChip').innerHTML = `<span class="priority-chip priority-${i.priority}">${i.priority} priority</span>`;
-  document.getElementById('id-category').textContent = i.category;
-  document.getElementById('id-reporter').textContent = i.reporter;
-  document.getElementById('id-date').textContent = fmtDate(i.reportedAt);
-  document.getElementById('id-assignee').textContent = i.assignee || '— Unassigned —';
-  document.getElementById('id-description').textContent = i.description;
-  document.getElementById('id-causes').textContent = i.causes || '—';
-  document.getElementById('id-checks').textContent = i.checks || '—';
-
-  const statusSel = document.getElementById('id-statusSelect');
-  statusSel.innerHTML = ISSUE_STATUSES.map(s=>`<option ${s===i.status?'selected':''}>${s}</option>`).join('');
-  document.getElementById('id-assigneeInput').value = i.assignee || '';
-
-  document.getElementById('id-maintNote').value = i.maintenance?.note || '';
-  document.getElementById('id-maintParts').value = i.maintenance?.parts || '';
-  document.getElementById('id-maintCost').value = i.maintenance?.cost ?? '';
-  document.getElementById('id-maintDate').value = i.maintenance?.date || todayISO();
-  document.getElementById('id-nextServiceDate').value = i.maintenance?.nextService || '';
-  document.getElementById('id-formError').style.display = 'none';
-
-  toggleMaintenanceFields(statusSel.value);
-
-  // A closed issue may not be edited until reopened.
-  const isClosed = i.status === 'Closed';
-  document.getElementById('id-saveBtn').style.display = isClosed ? 'none' : 'inline-flex';
-
-  openModal('modal-issueDetail');
-};
-
-function toggleMaintenanceFields(status){
-  const show = ['Resolved','Closed'].includes(status);
-  document.getElementById('id-maintenanceFields').style.display = show ? 'block' : 'none';
-}
-document.getElementById('id-statusSelect').addEventListener('change', (e)=> toggleMaintenanceFields(e.target.value));
-
-document.getElementById('id-saveBtn').addEventListener('click', ()=>{
-  const i = getIssue(currentIssueId);
-  if(!i) return;
-  const asset = getAsset(i.assetCode);
-  const errEl = document.getElementById('id-formError');
-  errEl.style.display = 'none';
-
-  const newStatus = document.getElementById('id-statusSelect').value;
-  const assignee = document.getElementById('id-assigneeInput').value.trim();
-  const resolving = ['Resolved','Closed'].includes(newStatus);
-
-  // Business rule: an issue should not be resolved without a maintenance note.
-  if(resolving){
-    const note = document.getElementById('id-maintNote').value.trim();
-    const cost = document.getElementById('id-maintCost').value;
-    const compDate = document.getElementById('id-maintDate').value;
-    const nextDate = document.getElementById('id-nextServiceDate').value;
-
-    if(!note){
-      errEl.textContent = 'A maintenance note is required before this issue can be resolved or closed.';
-      errEl.style.display = 'flex';
-      return;
-    }
-    if(cost !== '' && Number(cost) < 0){
-      errEl.textContent = 'Maintenance cost cannot be negative.';
-      errEl.style.display = 'flex';
-      return;
-    }
-    if(nextDate && compDate && nextDate < compDate){
-      errEl.textContent = 'Next service date cannot be before the maintenance completion date.';
-      errEl.style.display = 'flex';
-      return;
-    }
-
-    i.maintenance = {
-      note, parts: document.getElementById('id-maintParts').value.trim(),
-      cost: cost==='' ? 0 : Number(cost), date: compDate || todayISO(), nextService: nextDate || ''
-    };
-    if(asset && nextDate) asset.nextService = nextDate;
-    if(asset) asset.lastService = compDate || todayISO();
-  }
-
-  const statusChanged = i.status !== newStatus;
-  i.status = newStatus;
-  i.assignee = assignee;
-
-  // Drive asset status from the issue status per the business-rule table.
-  if(asset){
-    asset.status = ISSUE_TO_ASSET_STATUS[newStatus] || asset.status;
-  }
-
-  if(statusChanged){
-    addHistory(i.assetCode, assignee || 'Technician', `Status updated to ${newStatus}`, i.id);
-  }
-  if(resolving){
-    addHistory(i.assetCode, assignee || 'Technician', `Maintenance recorded: ${i.maintenance.note}`, i.id);
-  }
-
-  persist();
-  renderAll();
-  closeModal('modal-issueDetail');
-  toast(`Issue ${i.id} updated.`);
-});
-
-/* =========================================================
-   PUBLIC ASSET PAGE (hash routing: #/asset/<code>)
-   ========================================================= */
-function renderPublicPage(code){
-  const a = getAsset(code);
-  const wrap = document.getElementById('publicPageContent');
-  if(!a){
-    wrap.innerHTML = `
-      <div class="public-head"><div class="brand-mark" style="background:var(--status-outofservice); color:#fff;">!</div><h2>Asset not found</h2></div>
-      <p class="small-muted">This QR code or link does not match any known asset. Please check with facilities staff.</p>
-      <div style="margin-top:20px;"><button class="btn btn-ghost" onclick="location.hash=''">Back to app</button></div>`;
-    return;
-  }
-  const recentHist = assetHistory(a.code).filter(h=>{
-    // safe recent activity only — no private technician notes shown publicly
-    return h.action.startsWith('Asset registered') || h.action.startsWith('Issue reported') || h.action.startsWith('Status updated');
-  }).slice(0,5);
-
-  wrap.innerHTML = `
-    <div class="public-head">
-      <div class="brand-mark">Q</div>
-      <div><div class="public-badge">Public asset page</div><h2>${escapeHtml(a.name)}</h2></div>
-    </div>
-    ${a.status==='Retired' ? `<div class="retired-banner">This asset is retired and no longer in active service.</div>` : ''}
-    <div class="panel" style="margin-bottom:16px;">
-      <div class="panel-body" style="padding:16px 18px;">
-        <div class="tag-code" style="padding-left:0; margin-bottom:10px;">${a.code}</div>
-        <span class="badge status-${slug(a.status)}">${a.status}</span>
-        <div class="info-list" style="margin-top:16px;">
-          <div class="item"><div class="k">Category</div><div class="v">${escapeHtml(a.category)}</div></div>
-          <div class="item"><div class="k">Location</div><div class="v">${escapeHtml(a.location)}</div></div>
-          <div class="item"><div class="k">Current condition</div><div class="v">${a.condition}</div></div>
-          <div class="item"><div class="k">Last service</div><div class="v">${fmtDate(a.lastService)}</div></div>
-          <div class="item"><div class="k">Next service</div><div class="v">${fmtDate(a.nextService)}</div></div>
-        </div>
-      </div>
-    </div>
-    <div class="section-title">Recent activity</div>
-    <div class="timeline" style="margin-bottom:20px;">
-      ${recentHist.length ? recentHist.map(h=>`
-        <div class="timeline-item"><div class="timeline-dot"></div>
-          <div class="body"><div class="action">${escapeHtml(h.action)}</div><div class="meta">${fmtDate(h.at)}</div></div>
-        </div>`).join('') : '<div class="empty-row">No recent activity.</div>'}
-    </div>
-    ${a.status==='Retired' ? '' : `<button class="btn btn-accent" style="width:100%; justify-content:center;" onclick="openPublicReportForm('${a.code}')">Report an issue</button>`}
-    <div style="margin-top:10px; text-align:center;"><a href="#" onclick="location.hash=''; return false;" class="small-muted">Open full MaintainIQ dashboard →</a></div>
-  `;
-}
-
-window.openPublicReportForm = function(code){
-  location.hash = '';
-  setTimeout(()=>{ openReportIssue(code); }, 50);
-};
-
-function handleRoute(){
-  const hash = location.hash;
-  const match = hash.match(/^#\/asset\/(.+)$/);
-  if(match){
-    const code = decodeURIComponent(match[1]);
-    document.getElementById('appRoot').style.display = 'none';
-    document.getElementById('publicPage').style.display = 'block';
-    renderPublicPage(code);
-  } else {
-    document.getElementById('appRoot').style.display = 'flex';
-    document.getElementById('publicPage').style.display = 'none';
-  }
-}
-window.addEventListener('hashchange', handleRoute);
-
-/* =========================================================
-   SEARCH / FILTER LISTENERS
-   ========================================================= */
-['assetSearch','assetStatusFilter','assetCategoryFilter'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', renderAssets);
-  document.getElementById(id).addEventListener('change', renderAssets);
-});
-['issueSearch','issueStatusFilter','issuePriorityFilter'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', renderIssues);
-  document.getElementById(id).addEventListener('change', renderIssues);
-});
-
-/* =========================================================
-   RESET DEMO DATA
-   ========================================================= */
-document.getElementById('resetDemoBtn').addEventListener('click', ()=>{
-  if(!confirm('Reset all demo data? This clears every asset, issue, and history record you have added and restores the original five demo assets.')) return;
-  db = seedData();
-  persist();
-  renderAll();
-  toast('Demo data has been reset.');
-});
-
-/* =========================================================
-   INIT
-   ========================================================= */
-renderAll();
-handleRoute();
-</script>
+  <script src="app.js"></script>
 </body>
+
 </html>
