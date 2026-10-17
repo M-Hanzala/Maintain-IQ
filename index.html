@@ -11,6 +11,8 @@
     href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap"
     rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3"></script>
+  <script src="supabase-config.js"></script>
 </head>
 
 <body>
@@ -18,11 +20,70 @@
   <div id="toast"></div>
 
   <!-- =========================================================
-     PUBLIC ASSET PAGE (shown when URL has #/asset/<code>)
+     PUBLIC ASSET PAGE (shown when URL has #/asset/<public-token>)
      ========================================================= -->
   <div id="publicPage" style="display:none;">
     <div class="public-page" id="publicPageContent"></div>
   </div>
+
+  <section class="auth-screen" id="authScreen" hidden>
+    <div class="auth-card">
+      <div class="brand-mark">Q</div>
+      <h1>MaintainIQ</h1>
+      <p class="auth-intro">Sign in to your company workspace.</p>
+      <div class="banner warn" id="authConfigWarning" hidden>
+        Configure the Supabase project URL and publishable key in <code>supabase-config.js</code> to enable the
+        workspace.
+      </div>
+      <div class="banner danger" id="authError" role="alert" hidden></div>
+      <div class="banner" id="authMessage" role="status" hidden></div>
+
+      <form id="loginForm">
+        <div class="field"><label for="loginEmail">Email</label><input id="loginEmail" name="email" type="email"
+            autocomplete="email" required></div>
+        <div class="field"><label for="loginPassword">Password</label><input id="loginPassword" name="password"
+            type="password" autocomplete="current-password" required></div>
+        <button class="btn btn-primary auth-submit" type="submit">Sign in</button>
+        <div class="auth-links"><button class="text-button" type="button" data-auth-panel="resetForm">Forgot
+            password?</button><button class="text-button" type="button" data-auth-panel="signupForm">Create company
+            account</button></div>
+      </form>
+
+      <form id="signupForm" hidden>
+        <div class="field"><label for="signupCompany">Company name</label><input id="signupCompany" name="company"
+            autocomplete="organization" required maxlength="120"></div>
+        <div class="field"><label for="signupEmail">Email</label><input id="signupEmail" name="email" type="email"
+            autocomplete="email" required></div>
+        <div class="field"><label for="signupPassword">Password</label><input id="signupPassword" name="password"
+            type="password" autocomplete="new-password" minlength="8" required></div>
+        <button class="btn btn-primary auth-submit" type="submit">Register company</button>
+        <div class="auth-links"><button class="text-button" type="button" data-auth-panel="loginForm">Back to sign
+            in</button></div>
+      </form>
+
+      <form id="resetForm" hidden>
+        <div class="field"><label for="resetEmail">Account email</label><input id="resetEmail" name="email" type="email"
+            autocomplete="email" required></div>
+        <button class="btn btn-primary auth-submit" type="submit">Send password reset link</button>
+        <div class="auth-links"><button class="text-button" type="button" data-auth-panel="loginForm">Back to sign
+            in</button></div>
+      </form>
+
+      <form id="recoveryForm" hidden>
+        <div class="field"><label for="recoveryPassword">New password</label><input id="recoveryPassword"
+            name="password" type="password" autocomplete="new-password" minlength="8" required></div>
+        <button class="btn btn-primary auth-submit" type="submit">Save new password</button>
+      </form>
+
+      <form id="companyForm" hidden>
+        <p class="auth-intro">Your account has no company workspace yet. Register one to continue.</p>
+        <div class="field"><label for="companyName">Company name</label><input id="companyName" name="company"
+            autocomplete="organization" required maxlength="120"></div>
+        <button class="btn btn-primary auth-submit" type="submit">Register company</button>
+        <button class="btn btn-ghost auth-submit" id="companyLogoutBtn" type="button">Sign out</button>
+      </form>
+    </div>
+  </section>
 
   <!-- =========================================================
      MAIN APP
@@ -82,6 +143,12 @@
         <div>
           <h1 id="topbarTitle">Dashboard</h1>
           <div class="sub" id="topbarSub">Overview of assets and open work</div>
+        </div>
+        <div class="topbar-actions">
+          <label class="sr-only" for="companySelect">Company</label>
+          <select id="companySelect" aria-label="Company workspace"></select>
+          <button class="btn btn-ghost btn-sm" id="registerCompanyBtn" type="button">New company</button>
+          <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">Sign out</button>
         </div>
       </div>
 

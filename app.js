@@ -1,6 +1,6 @@
 /* =========================================================
-   MaintainIQ — Track C frontend prototype
-   Vanilla JS + localStorage persistence. No backend required.
+   MaintainIQ — Track C frontend
+   Supabase Auth + company-scoped PostgreSQL persistence.
    ========================================================= */
 
 const STORAGE_KEY = 'maintainiq_data_v1';
@@ -81,21 +81,482 @@ function seedData() {
     return { assets, issues, history, issueSeq: 1004 };
 }
 
-let db = loadData();
+const EMPTY_DB = () => ({ assets: [], issues: [], history: [], issueSeq: 1001 });
+const supabaseConfig = window.MAINTAINIQ_SUPABASE_CONFIG || {};
+const supabaseConfigured = Boolean(
+    window.supabase?.createClient &&
+    /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(supabaseConfig.url || '') &&
+    typeof supabaseConfig.publishableKey === 'string' &&
+    supabaseConfig.publishableKey.length > 20
+);
+const supabaseClient = supabaseConfigured
+    ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
+    : null;
 
-function loadData() {
+let db = EMPTY_DB();
+let activeCompany = null;
+let activeUser = null;
+let persistedSnapshot = null;
+let workspaceLoading = false;
+
+function cloneData(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function showAuth(panel = 'loginForm', message = '') {
+    document.getElementById('appRoot').style.display = 'none';
+    document.getElementById('authScreen').hidden = false;
+    document.getElementById('authError').hidden = true;
+    document.getElementById('authMessage').hidden = !message;
+    document.getElementById('authMessage').textContent = message;
+    ['loginForm', 'signupForm', 'resetForm', 'recoveryForm', 'companyForm'].forEach(id => {
+        document.getElementById(id).hidden = id !== panel;
+    });
+    document.getElementById('authConfigWarning').hidden = supabaseConfigured;
+    document.querySelectorAll('#authScreen form input').forEach(input => { input.disabled = !supabaseConfigured; });
+    document.querySelectorAll('#authScreen form button').forEach(button => { button.disabled = !supabaseConfigured; });
+    document.querySelectorAll('#authScreen [data-auth-panel]').forEach(button => { button.disabled = !supabaseConfigured; });
+}
+
+function showAuthError(error) {
+    const box = document.getElementById('authError');
+    box.textContent = error?.message || String(error);
+    box.hidden = false;
+    document.getElementById('authMessage').hidden = true;
+}
+
+function requireSupabase() {
+    if (!supabaseClient) throw new Error('Supabase is not configured. Set the project URL and publishable key in supabase-config.js.');
+    return supabaseClient;
+}
+
+function assetFromRow(row) {
+    return {
+        code: row.code, name: row.name, category: row.category, location: row.location,
+        condition: row.condition, status: row.status, lastService: row.last_service || '',
+        nextService: row.next_service || '', createdAt: row.created_at, publicToken: row.public_token,
+        _version: row.version
+    };
+}
+
+function issueFromRow(row) {
+    return {
+        id: row.id, assetCode: row.asset_code, title: row.title, category: row.category,
+        priority: row.priority, status: row.status, reporter: row.reporter, assignee: row.assignee,
+        description: row.description, causes: row.causes, checks: row.checks,
+        reportedAt: row.reported_at, maintenance: row.maintenance, _version: row.version
+    };
+}
+
+function historyFromRow(row) {
+    return { id: row.id, assetCode: row.asset_code, actor: row.actor, action: row.action, issueId: row.issue_id, at: row.at };
+}
+
+async function selectAllRows(buildQuery) {
+    const rows = [];
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await buildQuery().range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        rows.push(...data);
+        if (data.length < pageSize) return rows;
+    }
+}
+
+function assetToRow(asset) {
+    return {
+        company_id: activeCompany.id, code: asset.code, name: asset.name, category: asset.category,
+        location: asset.location, condition: asset.condition, status: asset.status,
+        last_service: asset.lastService || null, next_service: asset.nextService || null,
+        created_at: asset.createdAt, public_token: asset.publicToken, version: asset._version || 1
+    };
+}
+
+function issueToRow(issue) {
+    return {
+        company_id: activeCompany.id, id: issue.id, asset_code: issue.assetCode, title: issue.title,
+        category: issue.category, priority: issue.priority, status: issue.status, reporter: issue.reporter,
+        assignee: issue.assignee, description: issue.description, causes: issue.causes, checks: issue.checks,
+        reported_at: issue.reportedAt, maintenance: issue.maintenance, version: issue._version || 1
+    };
+}
+
+function historyToRow(item) {
+    return {
+        id: item.id, company_id: activeCompany.id, asset_code: item.assetCode, actor: item.actor,
+        action: item.action, issue_id: item.issueId, at: item.at
+    };
+}
+
+async function loadCompanyData(companyId) {
+    const client = requireSupabase();
+    const [assetRows, issueRows, historyRows] = await Promise.all([
+        selectAllRows(() => client.from('assets').select('*').eq('company_id', companyId).order('code')),
+        selectAllRows(() => client.from('issues').select('*').eq('company_id', companyId).order('id')),
+        selectAllRows(() => client.from('history').select('*').eq('company_id', companyId).order('id'))
+    ]);
+    const assets = assetRows.map(assetFromRow);
+    const issues = issueRows.map(issueFromRow);
+    const history = historyRows.map(historyFromRow);
+    const nextIssue = issues.reduce((next, issue) => {
+        const number = Number(issue.id.match(/\d+$/)?.[0]);
+        return Number.isFinite(number) ? Math.max(next, number + 1) : next;
+    }, 1001);
+    return { assets, issues, history, issueSeq: nextIssue };
+}
+
+function comparableRecord(record) {
+    const { _version, ...fields } = record;
+    return JSON.stringify(fields);
+}
+
+async function syncRecords(table, key, records, before, toRow, returningFields) {
+    const previousByKey = new Map(before.map(record => [record[key], record]));
+    const changed = records.filter(record => {
+        const previous = previousByKey.get(record[key]);
+        return !previous || comparableRecord(record) !== comparableRecord(previous);
+    });
+    const inserts = changed.filter(record => !previousByKey.has(record[key]));
+    const updates = changed.filter(record => previousByKey.has(record[key]));
+
+    if (inserts.length) {
+        const { data, error } = await supabaseClient.from(table).insert(inserts.map(toRow)).select(returningFields);
+        if (error) throw error;
+        const inserted = new Map((data || []).map(row => [row[key], row]));
+        for (const record of inserts) {
+            const row = inserted.get(record[key]);
+            if (row) {
+                record._version = row.version || 1;
+                if (table === 'assets') record.publicToken = row.public_token;
+            }
+        }
+    }
+
+    for (const record of updates) {
+        const previous = previousByKey.get(record[key]);
+        const nextVersion = (previous._version || 1) + 1;
+        const { data, error } = await supabaseClient.from(table)
+            .update({ ...toRow(record), version: nextVersion })
+            .eq('company_id', activeCompany.id)
+            .eq(key, record[key])
+            .eq('version', previous._version || 1)
+            .select(returningFields);
+        if (error) throw error;
+        if (!data?.length) throw new Error(`This ${table === 'assets' ? 'asset' : 'issue'} changed in another session. Reload the workspace before saving again.`);
+        record._version = nextVersion;
+    }
+}
+
+async function persist() {
+    const previousSnapshot = cloneData(db);
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
-    } catch (e) { /* fall through to fresh seed */ }
-    const fresh = seedData();
-    saveData(fresh);
-    return fresh;
+        await syncRecords('assets', 'code', db.assets, persistedSnapshot?.assets || [], assetToRow, 'code,public_token,version');
+        await syncRecords('issues', 'id', db.issues, persistedSnapshot?.issues || [], issueToRow, 'id,version');
+        const oldHistoryIds = new Set((persistedSnapshot?.history || []).map(item => item.id));
+        const newHistory = db.history.filter(item => !oldHistoryIds.has(item.id));
+        if (newHistory.length) {
+            const { error } = await supabaseClient.from('history').insert(newHistory.map(historyToRow));
+            if (error) throw error;
+        }
+        persistedSnapshot = cloneData(db);
+    } catch (error) {
+        try {
+            db = await loadCompanyData(activeCompany.id);
+            persistedSnapshot = cloneData(db);
+            renderAll();
+        } catch (reloadError) {
+            db = previousSnapshot;
+            throw new Error(`Save failed: ${error.message}. Workspace refresh also failed: ${reloadError.message}`);
+        }
+        throw error;
+    }
 }
-function saveData(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+async function sha256(value) {
+    const bytes = new TextEncoder().encode(value);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
-function persist() { saveData(db); }
+
+async function stableUuid(value) {
+    const hex = (await sha256(value)).slice(0, 32).split('');
+    hex[12] = '5';
+    hex[16] = ((parseInt(hex[16], 16) & 3) | 8).toString(16);
+    const text = hex.join('');
+    return `${text.slice(0, 8)}-${text.slice(8, 12)}-${text.slice(12, 16)}-${text.slice(16, 20)}-${text.slice(20)}`;
+}
+
+async function importLegacyData(company) {
+    let raw;
+    try {
+        raw = localStorage.getItem(STORAGE_KEY);
+    } catch (error) {
+        throw new Error(`Could not read the existing local data: ${error.message}`);
+    }
+    if (!raw) return false;
+
+    let legacy;
+    try {
+        legacy = JSON.parse(raw);
+    } catch (error) {
+        throw new Error(`The existing local data is not valid JSON and was left untouched: ${error.message}`);
+    }
+    if (!legacy || !Array.isArray(legacy.assets) || !Array.isArray(legacy.issues) || !Array.isArray(legacy.history)) {
+        throw new Error('The existing local data has an unexpected format and was left untouched.');
+    }
+    if (!confirm(`Import ${legacy.assets.length} assets, ${legacy.issues.length} issues, and ${legacy.history.length} history records from this browser into "${company.name}"? Existing company records will never be overwritten. The local copy will remain in this browser.`)) return false;
+
+    const sourceHash = await sha256(raw);
+    const assets = legacy.assets.map(asset => ({
+        company_id: company.id, code: asset.code, name: asset.name, category: asset.category,
+        location: asset.location, condition: asset.condition, status: asset.status,
+        last_service: asset.lastService || null, next_service: asset.nextService || null,
+        created_at: asset.createdAt || todayISO()
+    }));
+    const issues = legacy.issues.map(issue => ({
+        company_id: company.id, id: issue.id, asset_code: issue.assetCode, title: issue.title,
+        category: issue.category, priority: issue.priority, status: issue.status,
+        reporter: issue.reporter, assignee: issue.assignee || '', description: issue.description,
+        causes: issue.causes || '', checks: issue.checks || '', reported_at: issue.reportedAt,
+        maintenance: issue.maintenance || null
+    }));
+    const history = await Promise.all(legacy.history.map(async (item, index) => ({
+        id: await stableUuid(`${sourceHash}:history:${index}:${JSON.stringify(item)}`),
+        company_id: company.id, asset_code: item.assetCode, actor: item.actor,
+        action: item.action, issue_id: item.issueId || null, at: item.at
+    })));
+
+    for (const [table, rows, conflict] of [
+        ['assets', assets, 'company_id,code'],
+        ['issues', issues, 'company_id,id'],
+        ['history', history, 'id']
+    ]) {
+        if (!rows.length) continue;
+        const { error } = await supabaseClient.from(table).upsert(rows, {
+            onConflict: conflict,
+            ignoreDuplicates: true
+        });
+        if (error) throw new Error(`Could not import legacy ${table}: ${error.message}`);
+    }
+    const importedNextIssue = legacy.issues.reduce((next, issue) => {
+        const number = Number(String(issue.id).match(/\d+$/)?.[0]);
+        return Number.isFinite(number) ? Math.max(next, number + 1) : next;
+    }, Number.isInteger(legacy.issueSeq) ? Math.max(1001, legacy.issueSeq) : 1001);
+    const { error: sequenceError } = await supabaseClient.rpc('advance_company_issue_sequence', {
+        target_company_id: company.id,
+        minimum_next: importedNextIssue
+    });
+    if (sequenceError) throw new Error(`Could not migrate the issue sequence: ${sequenceError.message}`);
+    localStorage.setItem(`${STORAGE_KEY}_imported_${company.id}`, sourceHash);
+    return true;
+}
+
+async function loadMemberships(user) {
+    const client = requireSupabase();
+    const { data: rows, error } = await client.from('company_members').select('company_id,role').eq('user_id', user.id);
+    if (error) throw error;
+    if (!rows.length) return [];
+    const { data: companies, error: companiesError } = await client.from('companies')
+        .select('id,name').in('id', rows.map(row => row.company_id)).order('name');
+    if (companiesError) throw companiesError;
+    return companies.map(company => ({
+        ...company,
+        role: rows.find(row => row.company_id === company.id)?.role || 'member'
+    }));
+}
+
+function updateCompanySelector(companies) {
+    const select = document.getElementById('companySelect');
+    select.innerHTML = companies.map(company =>
+        `<option value="${escapeHtml(company.id)}">${escapeHtml(company.name)}</option>`
+    ).join('');
+    select.value = activeCompany?.id || '';
+}
+
+async function openCompany(company, allowImport = true) {
+    const companyData = await loadCompanyData(company.id);
+    activeCompany = company;
+    db = companyData;
+    persistedSnapshot = cloneData(db);
+    if (allowImport) {
+        const marker = localStorage.getItem(`${STORAGE_KEY}_imported_${company.id}`);
+        if (!marker && await importLegacyData(company)) {
+            db = await loadCompanyData(company.id);
+            persistedSnapshot = cloneData(db);
+        }
+    }
+    renderAll();
+    updateCompanySelector(window.maintainIqCompanies || [company]);
+    document.getElementById('authScreen').hidden = true;
+    document.getElementById('appRoot').style.display = 'flex';
+    document.getElementById('resetDemoBtn').hidden = true;
+    handleRoute();
+}
+
+async function initializeWorkspace(user) {
+    if (workspaceLoading) return;
+    workspaceLoading = true;
+    activeUser = user;
+    try {
+        const companies = await loadMemberships(user);
+        window.maintainIqCompanies = companies;
+        if (!companies.length) {
+            showAuth('companyForm', 'Register a company workspace to continue.');
+            return;
+        }
+        const selected = companies.find(company => company.id === activeCompany?.id) || companies[0];
+        updateCompanySelector(companies);
+        await openCompany(selected);
+    } finally {
+        workspaceLoading = false;
+    }
+}
+
+function showApplicationError(error) {
+    showAuth();
+    showAuthError(error);
+}
+
+function setupAuthentication() {
+    if (!supabaseClient) {
+        showAuth();
+        return;
+    }
+
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+        setTimeout(() => {
+            if (event === 'SIGNED_OUT') {
+                activeUser = null;
+                activeCompany = null;
+                persistedSnapshot = null;
+                db = EMPTY_DB();
+                showAuth('loginForm', 'You have signed out.');
+            } else if (event === 'SIGNED_IN' && session) {
+                initializeWorkspace(session.user).catch(showApplicationError);
+            } else if (event === 'PASSWORD_RECOVERY') {
+                showAuth('recoveryForm', 'Choose a new password for your account.');
+            }
+        }, 0);
+    });
+
+    supabaseClient.auth.getSession().then(({ data, error }) => {
+        if (error) throw error;
+        if (data.session) initializeWorkspace(data.session.user).catch(showApplicationError);
+        else showAuth();
+    }).catch(showApplicationError);
+}
+
+document.querySelectorAll('[data-auth-panel]').forEach(button => {
+    button.addEventListener('click', () => showAuth(button.dataset.authPanel));
+});
+
+document.getElementById('loginForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+        const { error } = await requireSupabase().auth.signInWithPassword({
+            email: form.get('email'), password: form.get('password')
+        });
+        if (error) throw error;
+        showAuth('loginForm', 'Signing in…');
+    } catch (error) {
+        showAuthError(error);
+    }
+});
+
+document.getElementById('signupForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+        const { data, error } = await requireSupabase().auth.signUp({
+            email: form.get('email'),
+            password: form.get('password'),
+            options: { data: { company_name: form.get('company').trim() } }
+        });
+        if (error) throw error;
+        if (!data.session) showAuth('loginForm', 'Check your email to confirm the account, then sign in.');
+    } catch (error) {
+        showAuthError(error);
+    }
+});
+
+document.getElementById('resetForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+        const redirectTo = `${location.origin}${location.pathname}`;
+        const { error } = await requireSupabase().auth.resetPasswordForEmail(form.get('email'), { redirectTo });
+        if (error) throw error;
+        showAuth('loginForm', 'If the account exists, a password reset link has been sent.');
+    } catch (error) {
+        showAuthError(error);
+    }
+});
+
+document.getElementById('recoveryForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+        const { error } = await requireSupabase().auth.updateUser({ password: form.get('password') });
+        if (error) throw error;
+        showAuth('loginForm', 'Password updated. Sign in with your new password.');
+        await requireSupabase().auth.signOut();
+    } catch (error) {
+        showAuthError(error);
+    }
+});
+
+document.getElementById('companyForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+        const { error } = await requireSupabase().rpc('register_company', {
+            company_name: form.get('company').trim()
+        });
+        if (error) throw error;
+        await initializeWorkspace(activeUser);
+    } catch (error) {
+        showAuthError(error);
+    }
+});
+
+document.getElementById('companyLogoutBtn').addEventListener('click', async () => {
+    const { error } = await requireSupabase().auth.signOut();
+    if (error) showAuthError(error);
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    const { error } = await requireSupabase().auth.signOut();
+    if (error) toast(error.message, true);
+});
+
+document.getElementById('companySelect').addEventListener('change', async event => {
+    const company = (window.maintainIqCompanies || []).find(item => item.id === event.target.value);
+    if (!company) return;
+    try {
+        await openCompany(company);
+    } catch (error) {
+        event.target.value = activeCompany?.id || '';
+        toast(`Could not load this company: ${error.message}`, true);
+    }
+});
+
+document.getElementById('registerCompanyBtn').addEventListener('click', async () => {
+    const name = prompt('Company name');
+    if (!name?.trim()) return;
+    try {
+        const { data: companyId, error } = await requireSupabase().rpc('register_company', { company_name: name.trim() });
+        if (error) throw error;
+        const companies = await loadMemberships(activeUser);
+        window.maintainIqCompanies = companies;
+        const company = companies.find(item => item.id === companyId);
+        if (!company) throw new Error('The company was created but could not be loaded into your account.');
+        await openCompany(company);
+        updateCompanySelector(companies);
+    } catch (error) {
+        toast(`Could not register company: ${error.message}`, true);
+    }
+});
 
 /* -----------------------------------------------------------
    Utilities
@@ -113,7 +574,7 @@ function getIssue(id) { return db.issues.find(i => i.id === id); }
 function assetIssues(code) { return db.issues.filter(i => i.assetCode === code).sort((a, b) => b.reportedAt.localeCompare(a.reportedAt)); }
 function assetHistory(code) { return db.history.filter(h => h.assetCode === code).sort((a, b) => b.at.localeCompare(a.at)); }
 function addHistory(assetCode, actor, action, issueId = null) {
-    db.history.push({ assetCode, actor, action, issueId, at: todayISO() });
+    db.history.push({ id: crypto.randomUUID(), assetCode, actor, action, issueId, at: todayISO() });
 }
 function toast(msg, isErr = false) {
     const t = document.getElementById('toast');
@@ -124,7 +585,8 @@ function toast(msg, isErr = false) {
 }
 function publicUrlFor(code) {
     const base = location.href.split('#')[0];
-    return `${base}#/asset/${encodeURIComponent(code)}`;
+    const asset = getAsset(code);
+    return `${base}#/asset/${encodeURIComponent(asset?.publicToken || code)}`;
 }
 
 /* =========================================================
@@ -297,7 +759,7 @@ document.getElementById('openAddAssetBtn').addEventListener('click', () => {
     document.getElementById('f-assetCode').classList.remove('error');
     openModal('modal-addAsset');
 });
-document.getElementById('addAssetForm').addEventListener('submit', (e) => {
+document.getElementById('addAssetForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const code = fd.get('code').trim().toUpperCase();
@@ -317,7 +779,12 @@ document.getElementById('addAssetForm').addEventListener('submit', (e) => {
     };
     db.assets.push(asset);
     addHistory(code, 'Administrator', 'Asset registered');
-    persist();
+    try {
+        await persist();
+    } catch (error) {
+        toast(`Could not save asset: ${error.message}`, true);
+        return;
+    }
     renderAll();
     closeModal('modal-addAsset');
     toast(`Asset ${code} registered successfully.`);
@@ -384,7 +851,9 @@ document.querySelectorAll('#modal-assetDetail .tab-btn').forEach(btn => {
 });
 
 document.getElementById('ad-openPublicBtn').addEventListener('click', () => {
-    location.hash = `/asset/${encodeURIComponent(currentAssetCode)}`;
+    const asset = getAsset(currentAssetCode);
+    if (!asset) return;
+    location.hash = `/asset/${encodeURIComponent(asset.publicToken || asset.code)}`;
 });
 document.getElementById('ad-copyLinkBtn').addEventListener('click', () => {
     const url = publicUrlFor(currentAssetCode);
@@ -399,13 +868,18 @@ document.getElementById('ad-downloadQrBtn').addEventListener('click', () => {
     link.href = canvas.toDataURL('image/png');
     link.click();
 });
-document.getElementById('ad-retireBtn').addEventListener('click', () => {
+document.getElementById('ad-retireBtn').addEventListener('click', async () => {
     const a = getAsset(currentAssetCode);
     if (!a) return;
     if (!confirm(`Retire asset ${a.code}? This marks it as permanently removed from service.`)) return;
     a.status = 'Retired';
     addHistory(a.code, 'Administrator', 'Asset retired');
-    persist();
+    try {
+        await persist();
+    } catch (error) {
+        toast(`Could not retire asset: ${error.message}`, true);
+        return;
+    }
     renderAll();
     openAssetDetail(a.code);
     toast(`Asset ${a.code} retired.`);
@@ -527,14 +1001,25 @@ document.getElementById('runTriageBtn').addEventListener('click', () => {
     }, 700);
 });
 
-document.getElementById('reportIssueForm').addEventListener('submit', (e) => {
+document.getElementById('reportIssueForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const asset = getAsset(reportForAssetCode);
     if (!asset) return;
+    let issueId;
+    try {
+        const { data, error } = await requireSupabase().rpc('next_company_issue_id', {
+            target_company_id: activeCompany.id
+        });
+        if (error) throw error;
+        issueId = data;
+    } catch (error) {
+        toast(`Could not allocate an issue number: ${error.message}`, true);
+        return;
+    }
 
     const issue = {
-        id: `ISS-${db.issueSeq++}`,
+        id: issueId,
         assetCode: asset.code,
         title: fd.get('title').trim(),
         category: fd.get('category'),
@@ -551,7 +1036,12 @@ document.getElementById('reportIssueForm').addEventListener('submit', (e) => {
     db.issues.push(issue);
     asset.status = 'Issue Reported';
     addHistory(asset.code, issue.reporter, `Issue reported: ${issue.title}`, issue.id);
-    persist();
+    try {
+        await persist();
+    } catch (error) {
+        toast(`Could not submit issue: ${error.message}`, true);
+        return;
+    }
     renderAll();
     closeModal('modal-reportIssue');
     toast(`Issue ${issue.id} submitted.`);
@@ -607,7 +1097,7 @@ function toggleMaintenanceFields(status) {
 }
 document.getElementById('id-statusSelect').addEventListener('change', (e) => toggleMaintenanceFields(e.target.value));
 
-document.getElementById('id-saveBtn').addEventListener('click', () => {
+document.getElementById('id-saveBtn').addEventListener('click', async () => {
     const i = getIssue(currentIssueId);
     if (!i) return;
     const asset = getAsset(i.assetCode);
@@ -665,31 +1155,39 @@ document.getElementById('id-saveBtn').addEventListener('click', () => {
         addHistory(i.assetCode, assignee || 'Technician', `Maintenance recorded: ${i.maintenance.note}`, i.id);
     }
 
-    persist();
+    try {
+        await persist();
+    } catch (error) {
+        toast(`Could not save issue: ${error.message}`, true);
+        return;
+    }
     renderAll();
     closeModal('modal-issueDetail');
     toast(`Issue ${i.id} updated.`);
 });
 
 /* =========================================================
-   PUBLIC ASSET PAGE (hash routing: #/asset/<code>)
+   PUBLIC ASSET PAGE (hash routing: #/asset/<public-token>)
    ========================================================= */
-function renderPublicPage(code) {
-    const a = getAsset(code);
+async function renderPublicPage(identifier) {
     const wrap = document.getElementById('publicPageContent');
-    if (!a) {
-        wrap.innerHTML = `
+    wrap.innerHTML = '<div class="panel"><div class="panel-body">Loading asset…</div></div>';
+    try {
+        const { data, error } = await requireSupabase().rpc('get_public_asset', {
+            public_identifier: identifier
+        });
+        if (error) throw error;
+        if (!data) {
+            wrap.innerHTML = `
       <div class="public-head"><div class="brand-mark" style="background:var(--status-outofservice); color:#fff;">!</div><h2>Asset not found</h2></div>
       <p class="small-muted">This QR code or link does not match any known asset. Please check with facilities staff.</p>
       <div style="margin-top:20px;"><button class="btn btn-ghost" onclick="location.hash=''">Back to app</button></div>`;
-        return;
-    }
-    const recentHist = assetHistory(a.code).filter(h => {
-        // safe recent activity only — no private technician notes shown publicly
-        return h.action.startsWith('Asset registered') || h.action.startsWith('Issue reported') || h.action.startsWith('Status updated');
-    }).slice(0, 5);
+            return;
+        }
 
-    wrap.innerHTML = `
+        const a = data;
+        const recentHist = data.history || [];
+        wrap.innerHTML = `
     <div class="public-head">
       <div class="brand-mark">Q</div>
       <div><div class="public-badge">Public asset page</div><h2>${escapeHtml(a.name)}</h2></div>
@@ -697,12 +1195,12 @@ function renderPublicPage(code) {
     ${a.status === 'Retired' ? `<div class="retired-banner">This asset is retired and no longer in active service.</div>` : ''}
     <div class="panel" style="margin-bottom:16px;">
       <div class="panel-body" style="padding:16px 18px;">
-        <div class="tag-code" style="padding-left:0; margin-bottom:10px;">${a.code}</div>
-        <span class="badge status-${slug(a.status)}">${a.status}</span>
+        <div class="tag-code" style="padding-left:0; margin-bottom:10px;">${escapeHtml(a.code)}</div>
+        <span class="badge status-${slug(a.status)}">${escapeHtml(a.status)}</span>
         <div class="info-list" style="margin-top:16px;">
           <div class="item"><div class="k">Category</div><div class="v">${escapeHtml(a.category)}</div></div>
           <div class="item"><div class="k">Location</div><div class="v">${escapeHtml(a.location)}</div></div>
-          <div class="item"><div class="k">Current condition</div><div class="v">${a.condition}</div></div>
+          <div class="item"><div class="k">Current condition</div><div class="v">${escapeHtml(a.condition)}</div></div>
           <div class="item"><div class="k">Last service</div><div class="v">${fmtDate(a.lastService)}</div></div>
           <div class="item"><div class="k">Next service</div><div class="v">${fmtDate(a.nextService)}</div></div>
         </div>
@@ -715,15 +1213,53 @@ function renderPublicPage(code) {
           <div class="body"><div class="action">${escapeHtml(h.action)}</div><div class="meta">${fmtDate(h.at)}</div></div>
         </div>`).join('') : '<div class="empty-row">No recent activity.</div>'}
     </div>
-    ${a.status === 'Retired' ? '' : `<button class="btn btn-accent" style="width:100%; justify-content:center;" onclick="openPublicReportForm('${a.code}')">Report an issue</button>`}
+    ${a.status === 'Retired' ? '' : `
+      <button class="btn btn-accent" id="publicReportToggle" style="width:100%; justify-content:center;">Report an issue</button>
+      <form id="publicReportForm" class="panel" style="display:none; margin-top:14px; padding:16px;">
+        <div class="field"><label for="publicIssueTitle">Issue title</label><input id="publicIssueTitle" name="title" maxlength="160" required></div>
+        <div class="field"><label for="publicIssueCategory">Category</label><input id="publicIssueCategory" name="category" maxlength="80" required></div>
+        <div class="field"><label for="publicIssueReporter">Your name</label><input id="publicIssueReporter" name="reporter" maxlength="120" required></div>
+        <div class="field"><label for="publicIssueDescription">Description</label><textarea id="publicIssueDescription" name="description" maxlength="4000" required></textarea></div>
+        <div class="banner danger" id="publicIssueError" role="alert" hidden></div>
+        <button class="btn btn-primary" type="submit">Submit report</button>
+      </form>`}
     <div style="margin-top:10px; text-align:center;"><a href="#" onclick="location.hash=''; return false;" class="small-muted">Open full MaintainIQ dashboard →</a></div>
   `;
+        const toggle = document.getElementById('publicReportToggle');
+        const formElement = document.getElementById('publicReportForm');
+        if (toggle && formElement) {
+            toggle.addEventListener('click', () => { formElement.style.display = 'block'; });
+            formElement.addEventListener('submit', async event => {
+                event.preventDefault();
+                const values = new FormData(event.currentTarget);
+                const errorBox = document.getElementById('publicIssueError');
+                try {
+                    const { data: issueId, error: reportError } = await requireSupabase().rpc('submit_public_issue', {
+                        public_identifier: a.publicToken || identifier,
+                        issue_title: values.get('title').trim(),
+                        issue_category: values.get('category').trim(),
+                        reporter_name: values.get('reporter').trim(),
+                        issue_description: values.get('description').trim()
+                    });
+                    if (reportError) throw reportError;
+                    await renderPublicPage(a.publicToken || identifier);
+                    const success = document.createElement('div');
+                    success.className = 'banner';
+                    success.textContent = `Report ${issueId} submitted successfully.`;
+                    document.getElementById('publicPageContent').prepend(success);
+                } catch (reportError) {
+                    errorBox.textContent = reportError.message;
+                    errorBox.hidden = false;
+                }
+            });
+        }
+    } catch (error) {
+        wrap.innerHTML = `
+      <div class="public-head"><div class="brand-mark" style="background:var(--status-outofservice); color:#fff;">!</div><h2>Asset unavailable</h2></div>
+      <p class="small-muted">${escapeHtml(error.message)}</p>
+      <div style="margin-top:20px;"><button class="btn btn-ghost" onclick="location.hash=''">Back to app</button></div>`;
+    }
 }
-
-window.openPublicReportForm = function (code) {
-    location.hash = '';
-    setTimeout(() => { openReportIssue(code); }, 50);
-};
 
 function handleRoute() {
     const hash = location.hash;
@@ -731,11 +1267,18 @@ function handleRoute() {
     if (match) {
         const code = decodeURIComponent(match[1]);
         document.getElementById('appRoot').style.display = 'none';
+        document.getElementById('authScreen').hidden = true;
         document.getElementById('publicPage').style.display = 'block';
         renderPublicPage(code);
     } else {
-        document.getElementById('appRoot').style.display = 'flex';
         document.getElementById('publicPage').style.display = 'none';
+        if (activeUser && activeCompany) {
+            document.getElementById('authScreen').hidden = true;
+            document.getElementById('appRoot').style.display = 'flex';
+        } else {
+            document.getElementById('appRoot').style.display = 'none';
+            document.getElementById('authScreen').hidden = false;
+        }
     }
 }
 window.addEventListener('hashchange', handleRoute);
@@ -755,16 +1298,8 @@ window.addEventListener('hashchange', handleRoute);
 /* =========================================================
    RESET DEMO DATA
    ========================================================= */
-document.getElementById('resetDemoBtn').addEventListener('click', () => {
-    if (!confirm('Reset all demo data? This clears every asset, issue, and history record you have added and restores the original five demo assets.')) return;
-    db = seedData();
-    persist();
-    renderAll();
-    toast('Demo data has been reset.');
-});
-
 /* =========================================================
    INIT
    ========================================================= */
-renderAll();
+setupAuthentication();
 handleRoute();
